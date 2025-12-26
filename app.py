@@ -134,6 +134,27 @@ st.markdown("""
     .stButton > button p {
         color: #FFFFFF !important;
     }
+    
+    /* === 카드 스타일 === */
+    .stock-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+    
+    .stock-card h3 {
+        color: #FFFFFF;
+        margin-bottom: 15px;
+    }
+    
+    .stock-card .metric-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -755,22 +776,88 @@ with tab_manager:
     
     st.divider()
     
-    # 상세 거래 내역 (Ledger) 조회
-    st.subheader("📝 종목별 거래 내역 조회")
-    if not df_portfolio.empty:
-        ledger_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df_portfolio.iterrows()]
-        ledger_stock = st.selectbox("내역을 확인할 종목 선택", ledger_options, key="ledger_select")
-        ledger_symbol = ledger_stock.split("(")[1].replace(")", "").strip()
+    # ==========================================
+    # 보유 종목 카드 형태로 표시 (각 카드에 거래 입력 폼 포함)
+    # ==========================================
+    if not filtered_pf.empty:
+        st.subheader("📦 보유 종목 상세 관리")
         
-        # Transactions에서 해당 종목 필터링
-        if not df_trans.empty and 'Symbol' in df_trans.columns:
-            my_ledger = df_trans[df_trans['Symbol'].astype(str).str.strip().str.upper() == ledger_symbol.upper()].copy()
-            if not my_ledger.empty:
-                my_ledger = my_ledger.sort_values(by='Date', ascending=False)
-                st.dataframe(my_ledger, use_container_width=True)
-            else:
-                st.info("거래 내역이 없습니다.")
+        # 보유 중인 종목만 필터링
+        holding_stocks = filtered_pf[filtered_pf['Holdings'] > 0].copy()
+        
+        if not holding_stocks.empty:
+            # 보유 종목을 카드 형태로 반복 표시
+            for idx, stock in holding_stocks.iterrows():
+                symbol = stock['Symbol']
+                name = stock['Name']
+                holdings = stock['Holdings']
+                avg_price = stock['AvgPrice']
+                current_price = stock['CurrentPrice']
+                current_value = stock['CurrentValue']
+                unrealized_profit = stock['UnrealizedProfit']
+                return_rate = stock['ReturnRate']
+                realized_profit = stock['RealizedProfit']
+                strategy = stock['Strategy']
+                
+                # 카드 컨테이너
+                with st.container():
+                    st.markdown(f"""
+                    <div class="stock-card">
+                        <h3>{name} ({symbol})</h3>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # 종목 요약 정보 (메트릭)
+                    metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
+                    metric_col1.metric("보유 수량", f"{holdings:,} 주")
+                    metric_col2.metric("평단가", f"{avg_price:,.0f}원")
+                    metric_col3.metric("현재가", f"{current_price:,.0f}원")
+                    metric_col4.metric("평가 손익", f"{unrealized_profit:,.0f}원", f"{return_rate:.2f}%")
+                    metric_col5.metric("실현 손익", f"{realized_profit:,.0f}원", delta_color="off")
+                    
+                    st.divider()
+                    
+                    # 거래 기록 입력 폼 (Expander)
+                    with st.expander(f"📝 {name} 거래 기록 남기기", expanded=False):
+                        with st.form(f"transaction_form_{symbol}_{idx}"):
+                            st.caption(f"종목: {name} ({symbol}) - 티커가 자동으로 적용됩니다.")
+                            
+                            # 거래 정보 입력
+                            trans_date = st.date_input("거래일", datetime.now(), key=f"trans_date_{symbol}_{idx}")
+                            trans_type = st.selectbox("유형", ["BUY", "SELL"], key=f"trans_type_{symbol}_{idx}")
+                            trans_price = st.number_input("단가 (원)", min_value=0, step=100, key=f"trans_price_{symbol}_{idx}")
+                            trans_qty = st.number_input("수량 (주)", min_value=1, step=1, key=f"trans_qty_{symbol}_{idx}")
+                            
+                            # 회차 계산 (해당 종목의 기존 거래 내역 확인)
+                            if not df_trans.empty and 'Symbol' in df_trans.columns:
+                                stock_transactions = df_trans[df_trans['Symbol'].astype(str).str.strip().str.upper() == symbol.upper()]
+                                if not stock_transactions.empty and 'Round' in stock_transactions.columns:
+                                    max_round = stock_transactions['Round'].astype(int).max() if 'Round' in stock_transactions.columns else 0
+                                    next_round = max_round + 1
+                                else:
+                                    next_round = 1
+                            else:
+                                next_round = 1
+                            
+                            trans_round = st.number_input("회차", min_value=1, value=next_round, key=f"trans_round_{symbol}_{idx}")
+                            trans_note = st.text_input("비고 (예: 물타기)", key=f"trans_note_{symbol}_{idx}")
+                            
+                            if st.form_submit_button("💾 거래 기록 저장", key=f"save_trans_{symbol}_{idx}"):
+                                if add_transaction_to_db(trans_date, symbol, trans_type, trans_price, trans_qty, trans_round, trans_note):
+                                    st.success(f"{name} 거래 기록이 저장되었습니다!")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                    
+                    # 해당 종목의 거래 내역 표시
+                    if not df_trans.empty and 'Symbol' in df_trans.columns:
+                        stock_ledger = df_trans[df_trans['Symbol'].astype(str).str.strip().str.upper() == symbol.upper()].copy()
+                        if not stock_ledger.empty:
+                            stock_ledger = stock_ledger.sort_values(by='Date', ascending=False)
+                            with st.expander(f"📋 {name} 거래 내역 보기", expanded=False):
+                                st.dataframe(stock_ledger, use_container_width=True)
+                    
+                    st.divider()
         else:
-            st.info("거래 내역이 없습니다.")
+            st.info("보유 중인 종목이 없습니다.")
     else:
         st.info("등록된 종목이 없습니다.")
