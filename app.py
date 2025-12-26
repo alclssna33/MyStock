@@ -1719,9 +1719,9 @@ with tab2:
                         <div style="flex: 0.5; text-align: center;">회차</div>
                         <div style="flex: 1.2; text-align: center;">날짜</div>
                         <div style="flex: 1.3; text-align: center;">목표액</div>
-                        <div style="flex: 1.2; text-align: center;">매수가</div>
-                        <div style="flex: 1.2; text-align: center;">매수량</div>
-                        <div style="flex: 0.8; text-align: center;">실행</div>
+                        <div style="flex: 1.5; text-align: center;">매수가</div>
+                        <div style="flex: 1.1; text-align: center;">매수량</div>
+                        <div style="flex: 0.7; text-align: center;">실행</div>
                     </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -1758,7 +1758,7 @@ with tab2:
                         # 각 행을 st.form으로 감싸서 리로드 방지
                         with st.form(f"buy_form_{stock_id}_{i}", clear_on_submit=False):
                             # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 매수량 | 실행
-                            col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 1.2, 0.8])
+                            col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.5, 1.1, 0.7])
                             
                             with col_round:
                                 st.markdown(f"<div style='text-align: center; font-size: 1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
