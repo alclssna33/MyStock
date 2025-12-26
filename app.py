@@ -1461,14 +1461,14 @@ with tab2:
                             existing_price = float(tx.get('price', 0)) if tx.get('price') else 0.0
                             existing_qty = int(tx.get('quantity', 0)) if tx.get('quantity') else 0
                         
-                        # 카드 형태로 각 행 표시
+                        # 카드 형태로 각 행 표시 (간격 제거)
                         with st.container():
                             st.markdown(f"""
                             <div style="
                                 background: rgba(255, 255, 255, 0.05);
                                 border-radius: 10px;
                                 padding: 1rem;
-                                margin-bottom: 0.5rem;
+                                margin-bottom: 0.2rem;
                                 border: 1px solid rgba(255, 255, 255, 0.1);
                             ">
                             """, unsafe_allow_html=True)
@@ -1493,12 +1493,13 @@ with tab2:
                             with col_price:
                                 buy_price = st.number_input(
                                     "매수가",
-                                    min_value=0.0,
-                                    value=existing_price,
-                                    step=100.0,
+                                    min_value=0,
+                                    value=int(existing_price) if existing_price > 0 else 0,
+                                    step=100,
                                     key=f"buy_price_{stock_id}_{i}",
                                     label_visibility="collapsed",
-                                    placeholder="가격"
+                                    placeholder="가격",
+                                    format="%d"
                                 )
                             
                             with col_qty:
@@ -1528,7 +1529,7 @@ with tab2:
                                     if buy_date and buy_price > 0 and buy_qty > 0:
                                         buy_txs[i] = {
                                             'date': str(buy_date),
-                                            'price': float(buy_price),
+                                            'price': int(buy_price),  # 정수로 저장
                                             'quantity': int(buy_qty)
                                         }
                                         
@@ -1548,28 +1549,30 @@ with tab2:
                     # 매도 기록 추가 입력 (폼으로 감싸서 리로드 방지)
                     st.caption(f"{stock_name} 매도 기록 추가")
                     with st.form(f"sell_form_{stock_id}", clear_on_submit=True):
-                        col_sell_input1, col_sell_input2, col_sell_input3, col_sell_input4 = st.columns([2, 2, 2, 1])
+                        col_sell_input1, col_sell_input2, col_sell_input3, col_sell_input4 = st.columns([2, 2, 2, 1], vertical_alignment="bottom")
                         
                         with col_sell_input1:
                             sell_date = st.date_input("날짜", datetime.now(), key=f"sell_date_{stock_id}", label_visibility="collapsed")
                         with col_sell_input2:
-                            sell_price = st.number_input("매도가 (원)", min_value=0, step=100, key=f"sell_price_{stock_id}", label_visibility="collapsed", placeholder="매도 가격")
+                            sell_price = st.number_input("매도가 (원)", min_value=0, step=100, value=None, key=f"sell_price_{stock_id}", label_visibility="collapsed", placeholder="매도 가격")
                         with col_sell_input3:
-                            sell_qty = st.number_input("매도 수량 (주)", min_value=1, step=1, key=f"sell_qty_{stock_id}", label_visibility="collapsed", placeholder="매도 수량")
+                            sell_qty = st.number_input("매도 수량 (주)", min_value=1, step=1, value=None, key=f"sell_qty_{stock_id}", label_visibility="collapsed", placeholder="매도 수량")
                         with col_sell_input4:
-                            st.write("")  # 공간 확보
                             if st.form_submit_button("추가", type="primary", use_container_width=True):
-                                new_sell = {
-                                    'id': f"{datetime.now().timestamp()}",
-                                    'date': str(sell_date),
-                                    'price': float(sell_price),
-                                    'quantity': int(sell_qty)
-                                }
-                                sell_txs.append(new_sell)
-                                df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
-                                save_split_purchase_data(df_split)
-                                st.success("매도 기록이 저장되었습니다!")
-                                st.rerun()
+                                if sell_price is None or sell_qty is None:
+                                    st.warning("매도가와 매도 수량을 입력해주세요.")
+                                else:
+                                    new_sell = {
+                                        'id': f"{datetime.now().timestamp()}",
+                                        'date': str(sell_date),
+                                        'price': float(sell_price),
+                                        'quantity': int(sell_qty)
+                                    }
+                                    sell_txs.append(new_sell)
+                                    df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
+                                    save_split_purchase_data(df_split)
+                                    st.success("매도 기록이 저장되었습니다!")
+                                    st.rerun()
                     
                     st.divider()
                     
@@ -1610,14 +1613,14 @@ with tab2:
                                     except:
                                         tx_date = datetime.now().date()
                                 
-                                # 카드 형태로 각 행 표시
+                                # 카드 형태로 각 행 표시 (간격 제거)
                                 with st.container():
                                     st.markdown(f"""
                                     <div style="
                                         background: rgba(255, 255, 255, 0.05);
                                         border-radius: 10px;
                                         padding: 1rem;
-                                        margin-bottom: 0.5rem;
+                                        margin-bottom: 0.2rem;
                                         border: 1px solid rgba(255, 255, 255, 0.1);
                                     ">
                                     """, unsafe_allow_html=True)
@@ -1646,7 +1649,7 @@ with tab2:
                                         st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; color: {profit_color}; font-weight: 600;'>{profit:,.0f}</div>", unsafe_allow_html=True)
                                     
                                     with col_action:
-                                        if st.button("🗑️ 삭제", key=f"delete_sell_{stock_id}_{i}", type="primary", use_container_width=True):
+                                        if st.button("삭제", key=f"delete_sell_{stock_id}_{i}", type="primary", use_container_width=True):
                                             sell_txs.pop(i)
                                             df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
                                             save_split_purchase_data(df_split)
