@@ -133,6 +133,48 @@ st.markdown("""
         background: rgba(255, 249, 196, 0.1) !important;
         border: 1px solid #FFD54F !important;
     }
+    
+    /* === 8. 매수 계획 테이블 스타일 === */
+    /* 날짜 입력 필드 스타일 */
+    div[data-baseweb="calendar"] {
+        background-color: #FFFFFF !important;
+        border-radius: 8px !important;
+    }
+    
+    /* 숫자 입력 필드 스타일 */
+    input[type="number"] {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        color: #FFFFFF !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 6px !important;
+        padding: 0.5rem !important;
+    }
+    
+    input[type="number"]:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+    }
+    
+    /* 매수 계획 카드 스타일 */
+    div[data-testid="stContainer"] {
+        background: transparent !important;
+    }
+    
+    /* 버튼 스타일 개선 */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 6px !important;
+        padding: 0.4rem 1rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1335,126 +1377,144 @@ with tab2:
                 with col_buy:
                     st.subheader("매수 계획 및 기록")
                     
-                    # 매수 테이블 데이터 준비
-                    buy_data = []
+                    # 테이블 헤더
+                    st.markdown("""
+                    <div style="
+                        background: rgba(99, 102, 241, 0.2);
+                        border-radius: 8px;
+                        padding: 0.8rem;
+                        margin-bottom: 0.5rem;
+                        border: 1px solid rgba(99, 102, 241, 0.3);
+                    ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+                        <div style="flex: 0.5; text-align: center;">회차</div>
+                        <div style="flex: 1.2; text-align: center;">날짜</div>
+                        <div style="flex: 1.3; text-align: center;">목표액</div>
+                        <div style="flex: 1.2; text-align: center;">매수가</div>
+                        <div style="flex: 0.8; text-align: center;">예상</div>
+                        <div style="flex: 1.2; text-align: center;">매수량</div>
+                        <div style="flex: 0.8; text-align: center;">실행</div>
+                    </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # 각 회차별로 개별 입력 폼 생성 (이미지 스타일)
                     for i in range(installments):
                         tx = buy_txs[i] if i < len(buy_txs) else None
-                        price = float(tx.get('price', 0)) if tx and tx.get('price') else 0.0
-                        estimated_qty = int(amount_per_installment / price) if price > 0 else 0
                         
-                        # 날짜를 datetime으로 변환 (달력 입력을 위해)
-                        date_val = None
-                        if tx and tx.get('date'):
-                            try:
-                                date_val = pd.to_datetime(tx.get('date')).date()
-                            except:
-                                date_val = None
+                        # 기존 데이터 불러오기
+                        existing_date = None
+                        existing_price = 0.0
+                        existing_qty = 0
                         
-                        buy_data.append({
-                            '회차': i + 1,
-                            '날짜': date_val,
-                            '목표액': f"{amount_per_installment:,.0f}원",
-                            '매수가': price,
-                            '예상': f"{estimated_qty:,}" if estimated_qty > 0 else '-',
-                            '매수량': int(tx.get('quantity', 0)) if tx and tx.get('quantity') else 0
-                        })
-                    
-                    buy_df = pd.DataFrame(buy_data)
-                    
-                    # 예상 수량을 계산하여 buy_df에 미리 반영
-                    for i in range(len(buy_df)):
-                        price = float(buy_df.iloc[i]['매수가']) if pd.notna(buy_df.iloc[i]['매수가']) else 0.0
-                        if price > 0:
-                            estimated_qty = int(amount_per_installment / price)
-                            buy_df.iloc[i, buy_df.columns.get_loc('예상')] = f"{estimated_qty:,}"
-                        else:
-                            buy_df.iloc[i, buy_df.columns.get_loc('예상')] = '-'
-                    
-                    # 편집 가능한 테이블 (날짜, 매수가, 매수량만 편집 가능)
-                    edited_df = st.data_editor(
-                        buy_df,
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={
-                            '회차': st.column_config.NumberColumn('회차', disabled=True),
-                            '날짜': st.column_config.DateColumn('날짜', width="medium", format="YYYY-MM-DD"),
-                            '목표액': st.column_config.TextColumn('목표액', disabled=True),
-                            '매수가': st.column_config.NumberColumn('매수가 (원)', min_value=0.0, step=100.0, format="%.0f"),
-                            '예상': st.column_config.TextColumn('예상', disabled=True),
-                            '매수량': st.column_config.NumberColumn('매수량 (주)', min_value=0, step=1, format="%d")
-                        },
-                        key=f"buy_editor_{stock_id}",
-                        num_rows="fixed"
-                    )
-                    
-                    # 매수가 변경 시 예상 수량 자동 계산 및 업데이트
-                    # edited_df의 매수가를 기반으로 예상 수량 재계산
-                    updated_buy_df = edited_df.copy()
-                    for i in range(len(edited_df)):
-                        price = float(edited_df.iloc[i]['매수가']) if pd.notna(edited_df.iloc[i]['매수가']) else 0.0
-                        if price > 0:
-                            estimated_qty = int(amount_per_installment / price)
-                            updated_buy_df.iloc[i, updated_buy_df.columns.get_loc('예상')] = f"{estimated_qty:,}"
-                        else:
-                            updated_buy_df.iloc[i, updated_buy_df.columns.get_loc('예상')] = '-'
-                    
-                    # 예상 수량이 업데이트된 테이블 표시 (읽기 전용, 정보 확인용)
-                    # 매수가가 변경되었는지 확인하여 예상 수량 업데이트
-                    if not updated_buy_df.equals(buy_df):
-                        # 예상 수량이 변경된 경우 업데이트된 버전 표시
-                        st.dataframe(
-                            updated_buy_df[['회차', '날짜', '목표액', '매수가', '예상', '매수량']],
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                        st.caption("💡 매수가를 입력하면 예상 수량이 자동으로 계산됩니다. 저장 버튼을 눌러 저장하세요.")
-                    else:
-                        st.caption("💡 매수가를 입력하면 예상 수량이 자동으로 계산됩니다.")
-                    
-                    # 저장 버튼
-                    if st.button("💾 저장", key=f"save_buy_{stock_id}", type="primary"):
-                        # buy_txs 리스트 초기화 및 확장
-                        while len(buy_txs) < installments:
-                            buy_txs.append(None)
+                        if tx and isinstance(tx, dict):
+                            if tx.get('date'):
+                                try:
+                                    existing_date = pd.to_datetime(tx.get('date')).date()
+                                except:
+                                    existing_date = datetime.now().date()
+                            existing_price = float(tx.get('price', 0)) if tx.get('price') else 0.0
+                            existing_qty = int(tx.get('quantity', 0)) if tx.get('quantity') else 0
                         
-                        # 편집된 데이터를 buy_txs에 반영
-                        for i in range(installments):
-                            row = edited_df.iloc[i]
+                        # 예상 수량 계산
+                        estimated_qty = int(amount_per_installment / existing_price) if existing_price > 0 else 0
+                        
+                        # 카드 형태로 각 행 표시
+                        with st.container():
+                            st.markdown(f"""
+                            <div style="
+                                background: rgba(255, 255, 255, 0.05);
+                                border-radius: 10px;
+                                padding: 1rem;
+                                margin-bottom: 0.5rem;
+                                border: 1px solid rgba(255, 255, 255, 0.1);
+                            ">
+                            """, unsafe_allow_html=True)
                             
-                            # 날짜 처리 (datetime.date 객체 또는 문자열)
-                            date_str = ''
-                            if pd.notna(row['날짜']):
-                                if isinstance(row['날짜'], (pd.Timestamp, datetime)):
-                                    date_str = row['날짜'].strftime("%Y-%m-%d")
-                                elif isinstance(row['날짜'], str):
-                                    try:
-                                        parsed_date = pd.to_datetime(row['날짜'])
-                                        date_str = parsed_date.strftime("%Y-%m-%d")
-                                    except:
-                                        date_str = str(row['날짜']).strip()
+                            # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 예상 | 매수량 | 실행
+                            col_round, col_date, col_target, col_price, col_est, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 0.8, 1.2, 0.8])
+                            
+                            with col_round:
+                                st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-size: 1.1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
+                            
+                            with col_date:
+                                buy_date = st.date_input(
+                                    "날짜",
+                                    value=existing_date if existing_date else datetime.now().date(),
+                                    key=f"buy_date_{stock_id}_{i}",
+                                    label_visibility="collapsed"
+                                )
+                            
+                            with col_target:
+                                st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; color: #9ca3af;'>₩{amount_per_installment:,.0f}</div>", unsafe_allow_html=True)
+                            
+                            with col_price:
+                                buy_price = st.number_input(
+                                    "매수가",
+                                    min_value=0.0,
+                                    value=existing_price,
+                                    step=100.0,
+                                    key=f"buy_price_{stock_id}_{i}",
+                                    label_visibility="collapsed",
+                                    placeholder="가격"
+                                )
+                            
+                            with col_est:
+                                # 매수가 변경 시 예상 수량 자동 계산
+                                # 세션 상태를 사용하여 실시간 업데이트
+                                if f"estimated_qty_{stock_id}_{i}" not in st.session_state:
+                                    st.session_state[f"estimated_qty_{stock_id}_{i}"] = estimated_qty
+                                
+                                # 매수가가 변경되었는지 확인
+                                if buy_price > 0:
+                                    new_estimated = int(amount_per_installment / buy_price)
+                                    if st.session_state[f"estimated_qty_{stock_id}_{i}"] != new_estimated:
+                                        st.session_state[f"estimated_qty_{stock_id}_{i}"] = new_estimated
+                                    st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-weight: 600; color: #10b981;'>{st.session_state[f'estimated_qty_{stock_id}_{i}']:,}</div>", unsafe_allow_html=True)
                                 else:
-                                    # date 객체인 경우
-                                    date_str = str(row['날짜'])
+                                    st.session_state[f"estimated_qty_{stock_id}_{i}"] = 0
+                                    st.markdown("<div style='text-align: center; padding-top: 0.8rem; color: #6b7280;'>-</div>", unsafe_allow_html=True)
                             
-                            price = float(row['매수가']) if pd.notna(row['매수가']) and row['매수가'] > 0 else 0.0
-                            quantity = int(row['매수량']) if pd.notna(row['매수량']) and row['매수량'] > 0 else 0
+                            with col_qty:
+                                buy_qty = st.number_input(
+                                    "매수량",
+                                    min_value=0,
+                                    value=existing_qty,
+                                    step=1,
+                                    key=f"buy_qty_{stock_id}_{i}",
+                                    label_visibility="collapsed",
+                                    placeholder="수량"
+                                )
                             
-                            # 데이터가 있는 경우 저장
-                            if date_str or price > 0 or quantity > 0:
-                                buy_txs[i] = {
-                                    'date': date_str,
-                                    'price': price,
-                                    'quantity': quantity
-                                }
-                            else:
-                                # 모두 비어있으면 None
-                                buy_txs[i] = None
-                        
-                        # 구글 스프레드시트에 저장
-                        df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
-                        save_split_purchase_data(df_split)
-                        st.success("매수 기록이 저장되었습니다!")
-                        st.rerun()
+                            with col_action:
+                                # 수정/기록 버튼
+                                if existing_date or existing_price > 0 or existing_qty > 0:
+                                    button_label = "수정"
+                                else:
+                                    button_label = "기록"
+                                
+                                if st.button(button_label, key=f"save_buy_row_{stock_id}_{i}", type="primary", use_container_width=True):
+                                    # buy_txs 리스트 확장
+                                    while len(buy_txs) < installments:
+                                        buy_txs.append(None)
+                                    
+                                    # 데이터 저장
+                                    if buy_date and buy_price > 0 and buy_qty > 0:
+                                        buy_txs[i] = {
+                                            'date': str(buy_date),
+                                            'price': float(buy_price),
+                                            'quantity': int(buy_qty)
+                                        }
+                                        
+                                        # 구글 스프레드시트에 저장
+                                        df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
+                                        save_split_purchase_data(df_split)
+                                        st.success(f"회차 {i+1} 매수 기록이 저장되었습니다!")
+                                        st.rerun()
+                                    else:
+                                        st.warning("날짜, 매수가, 매수량을 모두 입력해주세요.")
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
                 
                 with col_sell:
                     st.subheader("분할 매도 기록")
