@@ -1809,6 +1809,7 @@ with tab2:
             
             // 숨겨진 Streamlit 버튼 완전히 제거
             function hideBadgeClickButtons() {{
+                // 모든 badge_click 버튼 찾기
                 const hiddenButtons = document.querySelectorAll('button[key^="badge_click_"], button[key*="badge_click"]');
                 hiddenButtons.forEach(btn => {{
                     btn.style.display = 'none';
@@ -1821,9 +1822,10 @@ with tab2:
                     btn.style.position = 'absolute';
                     btn.style.left = '-9999px';
                     btn.style.pointerEvents = 'none';
-                    
                     btn.style.fontSize = '0';
                     btn.style.lineHeight = '0';
+                    btn.style.border = 'none';
+                    btn.style.background = 'transparent';
                     
                     // 부모 컨테이너도 숨기기
                     const parent = btn.closest('div[data-testid="stButton"]');
@@ -1839,8 +1841,10 @@ with tab2:
                     // 더 상위 컨테이너도 숨기기
                     const container = btn.closest('div[data-testid="stContainer"]');
                     if (container) {{
-                        const hasOnlyHiddenButtons = container.querySelectorAll('button:not([key^="badge_click_"]):not([key*="badge_click"])').length === 0;
-                        if (hasOnlyHiddenButtons) {{
+                        // 컨테이너 내부에 다른 버튼이 있는지 확인
+                        const otherButtons = container.querySelectorAll('button:not([key^="badge_click_"]):not([key*="badge_click"])');
+                        if (otherButtons.length === 0) {{
+                            // 다른 버튼이 없으면 컨테이너 전체 숨기기
                             container.style.display = 'none';
                             container.style.visibility = 'hidden';
                             container.style.height = '0';
@@ -1848,6 +1852,21 @@ with tab2:
                             container.style.padding = '0';
                             container.style.overflow = 'hidden';
                         }}
+                    }}
+                }});
+                
+                // 추가: 모든 stContainer 중 badge_click 버튼만 있는 컨테이너 찾아서 숨기기
+                const containers = document.querySelectorAll('div[data-testid="stContainer"]');
+                containers.forEach(container => {{
+                    const badgeButtons = container.querySelectorAll('button[key^="badge_click_"], button[key*="badge_click"]');
+                    const otherButtons = container.querySelectorAll('button:not([key^="badge_click_"]):not([key*="badge_click"])');
+                    if (badgeButtons.length > 0 && otherButtons.length === 0) {{
+                        container.style.display = 'none';
+                        container.style.visibility = 'hidden';
+                        container.style.height = '0';
+                        container.style.margin = '0';
+                        container.style.padding = '0';
+                        container.style.overflow = 'hidden';
                     }}
                 }});
             }}
@@ -1980,9 +1999,28 @@ with tab2:
             # 컨테이너를 숨기기 위해 CSS 적용
             st.markdown("""
             <style>
-            /* 숨겨진 버튼 컨테이너도 완전히 숨기기 */
+            /* 숨겨진 버튼 컨테이너도 완전히 숨기기 - 더 강력한 선택자 */
             div[data-testid="stContainer"]:has(button[key^="badge_click_"]),
-            div[data-testid="stContainer"]:has(button[key*="badge_click"]) {
+            div[data-testid="stContainer"]:has(button[key*="badge_click"]),
+            div[data-testid="stContainer"] > div:has(button[key^="badge_click_"]),
+            div[data-testid="stContainer"] > div:has(button[key*="badge_click"]),
+            /* 모든 컨테이너 내부의 badge_click 버튼 찾기 */
+            div[data-testid="stContainer"] button[key^="badge_click_"],
+            div[data-testid="stContainer"] button[key*="badge_click"] {
+                display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+                opacity: 0 !important;
+                width: 0 !important;
+                position: absolute !important;
+                left: -9999px !important;
+            }
+            /* 컨테이너 자체도 숨기기 */
+            div[data-testid="stContainer"]:has(> div > button[key^="badge_click_"]),
+            div[data-testid="stContainer"]:has(> div > button[key*="badge_click"]) {
                 display: none !important;
                 visibility: hidden !important;
                 height: 0 !important;
@@ -1993,7 +2031,22 @@ with tab2:
             </style>
             """, unsafe_allow_html=True)
             
+            # 숨겨진 컨테이너에 버튼 생성 (완전히 숨김)
             with st.container():
+                st.markdown("""
+                <style>
+                /* 이 컨테이너 자체를 숨기기 */
+                div[data-testid="stContainer"]:has(button[key^="badge_click_"]) {
+                    display: none !important;
+                    visibility: hidden !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
                 # 모든 종목에 대해 버튼 생성 (중복 없이)
                 created_stock_ids = set()
                 for stock_data in sorted_stocks:
