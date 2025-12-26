@@ -1336,7 +1336,7 @@ with tab2:
             progress = (current_invested / max_investment * 100) if max_investment > 0 else 0
             
             portfolio_data.append({
-                'id': stock.get('ID', ''),
+                'id': stock.get('Symbol', f'stock_{idx}'),  # Symbol을 ID로 사용
                 'name': stock.get('Name', ''),
                 'totalInvested': current_invested,
                 'progress': progress,
@@ -1517,7 +1517,8 @@ with tab2:
         st.subheader("📦 종목별 상세 관리")
         
         for idx, stock in df_split.iterrows():
-            stock_id = stock.get('ID', '')
+            # Symbol을 stock_id로 사용 (ID 컬럼이 없으므로)
+            stock_id = stock.get('Symbol', f'stock_{idx}')
             stock_name = stock.get('Name', '')
             market_cap = stock.get('MarketCap', 0)
             installments = stock.get('Installments', 3)
@@ -1664,73 +1665,75 @@ with tab2:
                         ">
                         """, unsafe_allow_html=True)
                         
-                        # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 매수량 | 실행
-                        col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 1.2, 0.8])
-                        
-                        with col_round:
-                            st.markdown(f"<div style='text-align: center; font-size: 1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
-                        
-                        with col_date:
-                            buy_date = st.date_input(
-                                "날짜",
-                                value=existing_date if existing_date else datetime.now().date(),
-                                key=f"buy_date_{stock_id}_{i}",
-                                label_visibility="collapsed"
-                            )
-                        
-                        with col_target:
-                            st.markdown(f"<div style='text-align: center; color: #9ca3af;'>₩{amount_per_installment:,.0f}</div>", unsafe_allow_html=True)
+                        # 각 행을 st.form으로 감싸서 리로드 방지
+                        with st.form(f"buy_form_{stock_id}_{i}", clear_on_submit=False):
+                            # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 매수량 | 실행
+                            col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 1.2, 0.8])
                             
-                        with col_price:
-                            buy_price = st.number_input(
-                                "매수가",
-                                min_value=0,
-                                value=int(existing_price) if existing_price > 0 else 0,
-                                step=100,
-                                key=f"buy_price_{stock_id}_{i}",
-                                label_visibility="collapsed",
-                                placeholder="가격",
-                                format="%d"
-                            )
-                        
-                        with col_qty:
-                            buy_qty = st.number_input(
-                                "매수량",
-                                min_value=0,
-                                value=existing_qty,
-                                step=1,
-                                key=f"buy_qty_{stock_id}_{i}",
-                                label_visibility="collapsed",
-                                placeholder="수량"
-                            )
-                        
-                        with col_action:
-                            # 수정/기록 버튼
-                            if existing_date or existing_price > 0 or existing_qty > 0:
-                                button_label = "수정"
-                            else:
-                                button_label = "기록"
+                            with col_round:
+                                st.markdown(f"<div style='text-align: center; font-size: 1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
                             
-                            if st.button(button_label, key=f"save_buy_row_{stock_id}_{i}", type="primary", use_container_width=True):
-                                # buy_txs 리스트 확장
-                                while len(buy_txs) < installments:
-                                    buy_txs.append(None)
+                            with col_date:
+                                buy_date = st.date_input(
+                                    "날짜",
+                                    value=existing_date if existing_date else datetime.now().date(),
+                                    key=f"buy_date_{stock_id}_{i}",
+                                    label_visibility="collapsed"
+                                )
+                            
+                            with col_target:
+                                st.markdown(f"<div style='text-align: center; color: #9ca3af;'>₩{amount_per_installment:,.0f}</div>", unsafe_allow_html=True)
                                 
-                                # 데이터 저장
-                                if buy_date and buy_price > 0 and buy_qty > 0:
-                                    buy_txs[i] = {
-                                        'date': str(buy_date),
-                                        'price': int(buy_price),  # 정수로 저장
-                                        'quantity': int(buy_qty)
-                                    }
-                                    
-                                    # 구글 스프레드시트에 저장
-                                    df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
-                                    save_split_purchase_data(df_split)
-                                    st.success(f"회차 {i+1} 매수 기록이 저장되었습니다!")
-                                    st.rerun()
+                            with col_price:
+                                buy_price = st.number_input(
+                                    "매수가",
+                                    min_value=0,
+                                    value=int(existing_price) if existing_price > 0 else None,
+                                    step=100,
+                                    key=f"buy_price_{stock_id}_{i}",
+                                    label_visibility="collapsed",
+                                    placeholder="가격",
+                                    format="%d"
+                                )
+                            
+                            with col_qty:
+                                buy_qty = st.number_input(
+                                    "매수량",
+                                    min_value=0,
+                                    value=existing_qty if existing_qty > 0 else None,
+                                    step=1,
+                                    key=f"buy_qty_{stock_id}_{i}",
+                                    label_visibility="collapsed",
+                                    placeholder="수량"
+                                )
+                            
+                            with col_action:
+                                # 수정/기록 버튼
+                                if existing_date or existing_price > 0 or existing_qty > 0:
+                                    button_label = "수정"
                                 else:
-                                    st.warning("날짜, 매수가, 매수량을 모두 입력해주세요.")
+                                    button_label = "기록"
+                                
+                                if st.form_submit_button(button_label, type="primary", use_container_width=True):
+                                    # buy_txs 리스트 확장
+                                    while len(buy_txs) < installments:
+                                        buy_txs.append(None)
+                                    
+                                    # 데이터 저장 (buy_price와 buy_qty가 None이 아닌 경우만 체크)
+                                    if buy_date and buy_price is not None and buy_price > 0 and buy_qty is not None and buy_qty > 0:
+                                        buy_txs[i] = {
+                                            'date': str(buy_date),
+                                            'price': int(buy_price),  # 정수로 저장
+                                            'quantity': int(buy_qty)
+                                        }
+                                        
+                                        # 구글 스프레드시트에 저장
+                                        df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
+                                        save_split_purchase_data(df_split)
+                                        st.success(f"회차 {i+1} 매수 기록이 저장되었습니다!")
+                                        st.rerun()
+                                    else:
+                                        st.warning("날짜, 매수가, 매수량을 모두 입력해주세요.")
                         
                         st.markdown("</div>", unsafe_allow_html=True)
                 
