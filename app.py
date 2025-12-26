@@ -1921,16 +1921,18 @@ with tab2:
             </script>
             """, unsafe_allow_html=True)
             
-            # 숨겨진 버튼 스타일 (먼저 적용)
+            # 숨겨진 버튼 스타일 (먼저 적용 - 더 강력하게)
             st.markdown("""
             <style>
             /* 숨겨진 버튼 완전히 제거 - 모든 가능한 선택자 사용 */
             button[key^="badge_click_"],
             button[key*="badge_click"],
+            button[data-testid*="baseButton"][key^="badge_click_"],
             div[data-testid="stButton"] button[key^="badge_click_"],
             div[data-testid="stButton"] button[key*="badge_click"],
             div:has(button[key^="badge_click_"]),
-            div:has(button[key*="badge_click"]) {
+            div:has(button[key*="badge_click"]),
+            section:has(button[key^="badge_click_"]) {
                 display: none !important;
                 visibility: hidden !important;
                 opacity: 0 !important;
@@ -1944,32 +1946,32 @@ with tab2:
                 pointer-events: none !important;
                 border: none !important;
                 background: transparent !important;
+                font-size: 0 !important;
+                line-height: 0 !important;
             }
             /* Streamlit 버튼 컨테이너도 숨기기 */
-            div[data-testid="stButton"]:has(button[key^="badge_click_"]) {
+            div[data-testid="stButton"]:has(button[key^="badge_click_"]),
+            div[data-testid="stButton"]:has(button[key*="badge_click"]),
+            div.stButton:has(button[key^="badge_click_"]) {
                 display: none !important;
                 visibility: hidden !important;
                 height: 0 !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                overflow: hidden !important;
             }
             </style>
             """, unsafe_allow_html=True)
             
             # Streamlit 버튼으로 클릭 이벤트 처리 (숨김)
-            # 컨테이너로 감싸서 숨기기
+            # 각 종목당 버튼을 한 번만 생성 (중복 방지)
             with st.container():
+                # 모든 종목에 대해 버튼 생성 (중복 없이)
+                created_stock_ids = set()
                 for stock_data in sorted_stocks:
                     stock_id = stock_data['id']
-                    if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
-                        st.session_state[f"expand_{stock_id}"] = True
-                        st.session_state[f"scroll_to_{stock_id}"] = True
-                        st.rerun()
-                
-                # 두 번째 줄 버튼도 생성
-                if len(sorted_stocks) > num_cols:
-                    for stock_data in sorted_stocks[num_cols:]:
-                        stock_id = stock_data['id']
+                    if stock_id not in created_stock_ids:
+                        created_stock_ids.add(stock_id)
                         if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
                             st.session_state[f"expand_{stock_id}"] = True
                             st.session_state[f"scroll_to_{stock_id}"] = True
