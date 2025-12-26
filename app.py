@@ -1801,6 +1801,54 @@ with tab2:
             setTimeout(setupBadgeEvents, 500);
             setTimeout(setupBadgeEvents, 1000);
             
+            // 숨겨진 Streamlit 버튼 완전히 제거
+            function hideBadgeClickButtons() {{
+                const hiddenButtons = document.querySelectorAll('button[key^="badge_click_"], button[key*="badge_click"]');
+                hiddenButtons.forEach(btn => {{
+                    btn.style.display = 'none';
+                    btn.style.visibility = 'hidden';
+                    btn.style.opacity = '0';
+                    btn.style.width = '0';
+                    btn.style.height = '0';
+                    btn.style.padding = '0';
+                    btn.style.margin = '0';
+                    btn.style.position = 'absolute';
+                    btn.style.left = '-9999px';
+                    btn.style.pointerEvents = 'none';
+                    
+                    // 부모 컨테이너도 숨기기
+                    const parent = btn.closest('div[data-testid="stButton"]');
+                    if (parent) {{
+                        parent.style.display = 'none';
+                        parent.style.visibility = 'hidden';
+                        parent.style.height = '0';
+                        parent.style.margin = '0';
+                        parent.style.padding = '0';
+                    }}
+                }});
+            }}
+            
+            // 여러 번 실행
+            hideBadgeClickButtons();
+            setTimeout(hideBadgeClickButtons, 100);
+            setTimeout(hideBadgeClickButtons, 500);
+            setTimeout(hideBadgeClickButtons, 1000);
+            
+            // MutationObserver로 계속 감시
+            const hideObserver = new MutationObserver(function(mutations) {{
+                hideBadgeClickButtons();
+            }});
+            
+            try {{
+                hideObserver.observe(document.body, {{
+                    childList: true,
+                    subtree: true,
+                    attributes: true
+                }});
+            }} catch(e) {{
+                console.log('Hide observer 오류:', e);
+            }}
+            
             console.log('뱃지 스타일 스크립트 로드 완료');
             </script>
             """
@@ -1873,38 +1921,59 @@ with tab2:
             </script>
             """, unsafe_allow_html=True)
             
-            # Streamlit 버튼으로 클릭 이벤트 처리 (숨김)
-            for stock_data in sorted_stocks:
-                stock_id = stock_data['id']
-                if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
-                    st.session_state[f"expand_{stock_id}"] = True
-                    st.session_state[f"scroll_to_{stock_id}"] = True
-                    st.rerun()
-            
-            # 두 번째 줄 버튼도 생성
-            if len(sorted_stocks) > num_cols:
-                for stock_data in sorted_stocks[num_cols:]:
-                    stock_id = stock_data['id']
-                    if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
-                        st.session_state[f"expand_{stock_id}"] = True
-                        st.session_state[f"scroll_to_{stock_id}"] = True
-                        st.rerun()
-            
-            # 숨겨진 버튼 스타일
+            # 숨겨진 버튼 스타일 (먼저 적용)
             st.markdown("""
             <style>
-            button[key^="badge_click_"] {
+            /* 숨겨진 버튼 완전히 제거 - 모든 가능한 선택자 사용 */
+            button[key^="badge_click_"],
+            button[key*="badge_click"],
+            div[data-testid="stButton"] button[key^="badge_click_"],
+            div[data-testid="stButton"] button[key*="badge_click"],
+            div:has(button[key^="badge_click_"]),
+            div:has(button[key*="badge_click"]) {
                 display: none !important;
                 visibility: hidden !important;
+                opacity: 0 !important;
                 width: 0 !important;
                 height: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 position: absolute !important;
                 left: -9999px !important;
+                overflow: hidden !important;
+                pointer-events: none !important;
+                border: none !important;
+                background: transparent !important;
+            }
+            /* Streamlit 버튼 컨테이너도 숨기기 */
+            div[data-testid="stButton"]:has(button[key^="badge_click_"]) {
+                display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             </style>
             """, unsafe_allow_html=True)
+            
+            # Streamlit 버튼으로 클릭 이벤트 처리 (숨김)
+            # 컨테이너로 감싸서 숨기기
+            with st.container():
+                for stock_data in sorted_stocks:
+                    stock_id = stock_data['id']
+                    if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
+                        st.session_state[f"expand_{stock_id}"] = True
+                        st.session_state[f"scroll_to_{stock_id}"] = True
+                        st.rerun()
+                
+                # 두 번째 줄 버튼도 생성
+                if len(sorted_stocks) > num_cols:
+                    for stock_data in sorted_stocks[num_cols:]:
+                        stock_id = stock_data['id']
+                        if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
+                            st.session_state[f"expand_{stock_id}"] = True
+                            st.session_state[f"scroll_to_{stock_id}"] = True
+                            st.rerun()
             
             # 두 번째 줄 뱃지 (필요한 경우)
             if len(sorted_stocks) > num_cols:
