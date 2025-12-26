@@ -488,8 +488,6 @@ def add_stock_callback():
     symbol = st.session_state.get("symbol_input", "")
     name = st.session_state.get("name_input", "")
     interest_date = st.session_state.get("interest_date_input", None)
-    buy_date = st.session_state.get("buy_date_input", None)
-    sell_date = st.session_state.get("sell_date_input", None)
     note = st.session_state.get("note_input", "")
     
     if symbol and name:
@@ -512,23 +510,6 @@ def add_stock_callback():
                 "BuyTransactions": "[]",
                 "SellTransactions": "[]"
             }
-            # 첫 번째 매수일/매도일이 있으면 BuyTransactions, SellTransactions에 추가
-            buy_txs = []
-            sell_txs = []
-            if buy_date:
-                buy_txs.append({
-                    "date": buy_date.strftime("%Y-%m-%d"),
-                    "price": 0,
-                    "quantity": 0
-                })
-            if sell_date:
-                sell_txs.append({
-                    "date": sell_date.strftime("%Y-%m-%d"),
-                    "price": 0,
-                    "quantity": 0
-                })
-            new_row["BuyTransactions"] = json.dumps(buy_txs) if buy_txs else "[]"
-            new_row["SellTransactions"] = json.dumps(sell_txs) if sell_txs else "[]"
             
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_stocks(df)
@@ -537,8 +518,6 @@ def add_stock_callback():
             st.session_state["symbol_input"] = ""
             st.session_state["name_input"] = ""
             st.session_state["interest_date_input"] = None
-            st.session_state["buy_date_input"] = None
-            st.session_state["sell_date_input"] = None
             st.session_state["note_input"] = ""
             
             st.session_state["add_result"] = {"type": "success", "message": f"{name} ({symbol}) 종목이 추가되었습니다!", "rerun": True}
@@ -555,8 +534,6 @@ with st.sidebar:
         symbol = st.text_input("티커 (예: AAPL, 005930.KS)", key="symbol_input")
         name = st.text_input("종목명", key="name_input")
         interest_date = st.date_input("관심일", value=None, key="interest_date_input")
-        buy_date = st.date_input("매수일 (선택사항)", value=None, key="buy_date_input")
-        sell_date = st.date_input("매도일 (선택사항)", value=None, key="sell_date_input")
         note = st.text_area("메모", key="note_input")
         
         st.form_submit_button("추가", on_click=add_stock_callback)
@@ -1400,25 +1377,40 @@ with tab2:
     # ==========================================
     with st.expander("➕ 새 종목 추가", expanded=False):
         with st.form("add_split_stock_form"):
-            name = st.text_input("종목명", placeholder="예: 삼성전자")
-            market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000")
-            installments = st.number_input("분할 횟수", min_value=1, value=3)
+            symbol = st.text_input("티커 (예: AAPL, 005930.KS)", placeholder="예: 005930.KS", key="split_symbol_input")
+            name = st.text_input("종목명", placeholder="예: 삼성전자", key="split_name_input")
+            interest_date = st.date_input("관심일", value=None, key="split_interest_date_input")
+            market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="split_market_cap_input")
+            installments = st.number_input("분할 횟수", min_value=1, value=3, key="split_installments_input")
             
             if st.form_submit_button("계획 추가"):
                 if name and market_cap > 0:
-                    new_id = f"{datetime.now().timestamp()}-{len(df_split)}"
-                    new_row = {
-                        "ID": new_id,
-                        "Name": name,
-                        "MarketCap": market_cap * 100000000,  # 억원을 원으로 변환
-                        "Installments": int(installments),
-                        "BuyTransactions": json.dumps([]),
-                        "SellTransactions": json.dumps([])
-                    }
-                    df_split = pd.concat([df_split, pd.DataFrame([new_row])], ignore_index=True)
-                    save_split_purchase_data(df_split)
-                    st.success(f"{name} 종목이 추가되었습니다!")
-                    st.rerun()
+                    # Symbol 중복 체크
+                    symbol_normalized = symbol.strip().upper() if symbol else ""
+                    all_stocks = load_stocks()
+                    
+                    if symbol_normalized:
+                        existing_symbols = all_stocks['Symbol'].astype(str).str.strip().str.upper()
+                        if symbol_normalized in existing_symbols.values:
+                            st.error("이미 등록된 티커입니다.")
+                        else:
+                            # 새 종목 추가
+                            new_row = {
+                                "Symbol": symbol_normalized,
+                                "Name": name,
+                                "InterestDate": interest_date.strftime("%Y-%m-%d") if interest_date else "",
+                                "Note": "",
+                                "MarketCap": market_cap * 100000000,  # 억원을 원으로 변환
+                                "Installments": int(installments),
+                                "BuyTransactions": json.dumps([]),
+                                "SellTransactions": json.dumps([])
+                            }
+                            df_split = pd.concat([df_split, pd.DataFrame([new_row])], ignore_index=True)
+                            save_split_purchase_data(df_split)
+                            st.success(f"{name} 종목이 추가되었습니다!")
+                            st.rerun()
+                    else:
+                        st.error("티커를 입력해주세요.")
                 else:
                     st.error("종목명과 시가총액을 입력해주세요.")
     
