@@ -1648,49 +1648,41 @@ with tab2:
                 # 디버깅: 진행률 확인용 (나중에 제거 가능)
                 # st.write(f"디버그: {name} - 진행률: {progress}%, progress_pct: {progress_pct}%")
                 
-                # 그라데이션을 더 명확하게 적용
+                # 그라데이션을 더 명확하게 적용 (한 줄로 만들기)
                 # 진행률이 0%면 전체 연한 초록, 100%면 전체 진한 초록
-                badges_html += f"""
-                <button 
-                    id="badge_btn_{stock_id}"
-                    class="stock-badge-btn"
-                    data-stock-id="{stock_id}"
-                    data-progress="{progress_pct}"
-                    style="
-                        background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%);
-                        border: 2px solid {dark_green};
-                        border-radius: 12px;
-                        padding: 0.8rem 1.5rem;
-                        color: #ffffff;
-                        font-weight: 600;
-                        font-size: 0.95rem;
-                        cursor: pointer;
-                        transition: all 0.3s;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                        font-family: 'Pretendard', sans-serif;
-                        min-width: 120px;
-                    "
-                >
-                    {name}
-                </button>
-                """
+                badges_html += f'<button id="badge_btn_{stock_id}" class="stock-badge-btn" data-stock-id="{stock_id}" data-progress="{progress_pct}" style="background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%); border: 2px solid {dark_green}; border-radius: 12px; padding: 0.8rem 1.5rem; color: #ffffff; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: Pretendard, sans-serif; min-width: 120px;">{name}</button>'
             
             badges_html += '</div>'
             
             # CSS 스타일 추가 (호버 효과 포함)
-            st.markdown(f"""
+            st.markdown("""
             <style>
-            .stock-badge-btn, [id^="badge_btn_"] {{
+            .stock-badge-btn, [id^="badge_btn_"] {
                 transition: all 0.3s ease !important;
-            }}
-            .stock-badge-btn:hover, [id^="badge_btn_"]:hover {{
+            }
+            .stock-badge-btn:hover, [id^="badge_btn_"]:hover {
                 transform: scale(1.05) !important;
                 box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
-            }}
+            }
             </style>
             """, unsafe_allow_html=True)
             
-            st.markdown(badges_html, unsafe_allow_html=True)
+            # HTML 렌더링 (한 번에)
+            try:
+                st.markdown(badges_html, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"HTML 렌더링 오류: {e}")
+                # 대체 방법: Streamlit 버튼 사용
+                badge_cols = st.columns(min(9, len(sorted_stocks)))
+                for idx, stock_data in enumerate(sorted_stocks):
+                    name = stock_data['name']
+                    stock_id = stock_data['id']
+                    col_idx = idx % len(badge_cols)
+                    with badge_cols[col_idx]:
+                        if st.button(name, key=f"badge_{stock_id}", use_container_width=True):
+                            st.session_state[f"expand_{stock_id}"] = True
+                            st.session_state[f"scroll_to_{stock_id}"] = True
+                            st.rerun()
             
             # JavaScript로 강제 스타일 적용 (더 강력한 버전)
             js_apply_styles = f"""
@@ -1926,30 +1918,7 @@ with tab2:
                     stock_id = stock_data['id']
                     progress_pct = min(100, max(0, progress))
                     
-                    badges_html_2 += f"""
-                    <button 
-                        id="badge_btn_{stock_id}_2"
-                        class="stock-badge-btn"
-                        data-stock-id="{stock_id}"
-                        data-progress="{progress_pct}"
-                        style="
-                            background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%);
-                            border: 2px solid {dark_green};
-                            border-radius: 12px;
-                            padding: 0.8rem 1.5rem;
-                            color: #ffffff;
-                            font-weight: 600;
-                            font-size: 0.95rem;
-                            cursor: pointer;
-                            transition: all 0.3s;
-                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                            font-family: 'Pretendard', sans-serif;
-                            min-width: 120px;
-                        "
-                    >
-                        {name}
-                    </button>
-                    """
+                    badges_html_2 += f'<button id="badge_btn_{stock_id}_2" class="stock-badge-btn" data-stock-id="{stock_id}" data-progress="{progress_pct}" style="background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%); border: 2px solid {dark_green}; border-radius: 12px; padding: 0.8rem 1.5rem; color: #ffffff; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: Pretendard, sans-serif; min-width: 120px;">{name}</button>'
                 
                 badges_html_2 += '</div>'
                 st.markdown(badges_html_2, unsafe_allow_html=True)
