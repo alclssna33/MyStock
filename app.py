@@ -1630,13 +1630,13 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성"""
+                """CSS 오버레이 기법으로 뱃지 생성 (Selector 수정됨)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
                 gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
                 
-                # Layer 1: Visual HTML div (그라데이션 뱃지)
+                # Layer 1: Visual HTML div (식별을 위한 클래스 badge-overlay-visual 포함)
                 st.markdown(f"""
                 <div class="badge-overlay-visual" style="
                     background: {gradient};
@@ -1657,32 +1657,28 @@ with tab2:
                     margin-bottom: 0;
                     position: relative;
                     z-index: 1;
+                    user-select: none; /* 텍스트 선택 방지 */
                 ">{name}</div>
                 """, unsafe_allow_html=True)
                 
-                # Layer 2: 투명 버튼 (클릭 이벤트 처리)
-                # CSS로 버튼을 투명하게 하고 음수 마진으로 겹치기
-                button_css_key = f"badge_button_{key.replace('badge_', '').replace('_r', '_').replace('-', '_')}"
-                st.markdown(f"""
+                # Layer 2: 투명 버튼 (CSS Selector 수정: key 대신 DOM 구조 활용)
+                # 원리: 'badge-overlay-visual' 클래스를 가진 마크다운 컨테이너 바로 다음에 오는 버튼 컨테이너를 타겟팅
+                st.markdown("""
                 <style>
-                div[data-testid="stButton"]:has(button[key="{key}"]) {{
+                div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) + div[data-testid="stButton"] {
                     margin-top: -48px !important;
                     position: relative !important;
                     z-index: 10 !important;
-                    pointer-events: auto !important;
-                }}
-                div[data-testid="stButton"]:has(button[key="{key}"]) button {{
+                }
+                div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) + div[data-testid="stButton"] button {
                     opacity: 0 !important;
                     background: transparent !important;
                     border: none !important;
                     color: transparent !important;
-                    cursor: pointer !important;
-                    min-height: 48px !important;
-                    padding: 0.8rem 1.5rem !important;
-                }}
-                div[data-testid="stButton"]:has(button[key="{key}"]) button:hover {{
-                    opacity: 0 !important;
-                }}
+                    width: 100% !important;
+                    height: 48px !important;
+                    padding: 0 !important;
+                }
                 </style>
                 """, unsafe_allow_html=True)
                 
