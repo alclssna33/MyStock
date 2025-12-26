@@ -174,20 +174,100 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* number_input 내부 스타일 강제 적용 - +, - 버튼 숨기기 */
+    /* number_input 내부 스타일 강제 적용 - +, - 버튼 완전히 숨기기 */
+    /* 모든 number input의 스피너 버튼 숨기기 */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button,
     div[data-baseweb="input"] input[type="number"]::-webkit-inner-spin-button,
     div[data-baseweb="input"] input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button {
+    div[data-baseweb="input"] input::-webkit-inner-spin-button,
+    div[data-baseweb="input"] input::-webkit-outer-spin-button {
         -webkit-appearance: none !important;
         appearance: none !important;
         margin: 0 !important;
         display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
     }
     
     /* Firefox에서도 스피너 숨기기 */
-    input[type="number"] {
+    input[type="number"],
+    div[data-baseweb="input"] input[type="number"] {
         -moz-appearance: textfield !important;
+    }
+    
+    /* BaseWeb input 컨테이너 내부의 모든 버튼 숨기기 (+, - 버튼) */
+    div[data-baseweb="input"] button,
+    div[data-baseweb="input"] > div > button,
+    div[data-baseweb="input"] > div > div > button,
+    div[data-baseweb="input"] > button,
+    div[data-baseweb="input"] * button {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+    }
+    
+    /* Streamlit number_input의 증가/감소 버튼 숨기기 */
+    button[aria-label*="increment"],
+    button[aria-label*="decrement"],
+    button[aria-label*="Increment"],
+    button[aria-label*="Decrement"],
+    button[data-baseweb*="increment"],
+    button[data-baseweb*="decrement"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+    
+    /* BaseWeb NumberInput의 스피너 컨트롤 숨기기 */
+    div[data-baseweb="input"] > div[role="button"],
+    div[data-baseweb="input"] svg[data-baseweb="icon"],
+    div[data-baseweb="input"] > div > div[role="button"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* 모든 number_input 관련 버튼 숨기기 (범용) */
+    div[data-baseweb="input"] * button,
+    div[data-baseweb="input"] button[type="button"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+    
+    /* Streamlit number_input의 모든 버튼 요소 숨기기 (최종) */
+    div[data-baseweb="input"] > div > div > button,
+    div[data-baseweb="input"] > div > button[type="button"],
+    div[data-baseweb="input"] button[aria-label],
+    div[data-baseweb="input"] button[title] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+    
+    /* BaseWeb input 내부의 모든 자식 요소 중 버튼 숨기기 */
+    div[data-baseweb="input"] button[type="button"],
+    div[data-baseweb="input"] > div > div > button {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
     }
     
     /* 매수 계획 카드 스타일 */
