@@ -1690,8 +1690,8 @@ with tab2:
             
             # 뱃지 버튼 스타일링 (CSS + JavaScript로 진행률 적용)
             if unique_stocks:
-                # 진행률 데이터 준비
-                progress_map = {stock['id']: min(100, max(0, stock['progress'])) for stock in unique_stocks}
+                # 진행률 데이터 준비 (종목명을 키로 사용)
+                progress_map = {{stock['name']: min(100, max(0, stock['progress'])) for stock in unique_stocks}}
                 
                 st.markdown(f"""
                 <style>
@@ -1722,37 +1722,56 @@ with tab2:
                     const lightGreen = '#86efac';
                     
                     function applyGradients() {{
-                        document.querySelectorAll('button[key^="badge_"]').forEach(btn => {{
-                            const key = btn.getAttribute('key');
-                            if (!key) return;
+                        // 모든 badge 버튼 찾기
+                        const buttons = document.querySelectorAll('div[data-testid="stButton"] button');
+                        buttons.forEach(btn => {{
+                            // 버튼의 텍스트(종목명) 가져오기
+                            const buttonText = btn.textContent.trim();
                             
-                            // key에서 stock_id 추출
-                            let stockId = null;
-                            for (const [id, progress] of Object.entries(progressMap)) {{
-                                if (key.includes(id) || key.includes('badge_' + id)) {{
-                                    stockId = id;
-                                    break;
-                                }}
-                            }}
-                            
-                            if (stockId && progressMap[stockId] !== undefined) {{
-                                const progress = progressMap[stockId];
+                            // progressMap에서 해당 종목명 찾기
+                            if (progressMap[buttonText] !== undefined) {{
+                                const progress = progressMap[buttonText];
                                 const gradient = `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progress}}%, ${{lightGreen}} ${{progress}}%, ${{lightGreen}} 100%)`;
+                                
+                                // 그라데이션 적용
                                 btn.style.background = gradient;
                                 btn.style.backgroundImage = gradient;
+                                btn.style.setProperty('background', gradient, 'important');
+                                btn.style.setProperty('background-image', gradient, 'important');
                             }}
                         }});
                     }}
                     
+                    // 즉시 실행
                     applyGradients();
+                    
+                    // DOM 로드 후 실행
                     if (document.readyState === 'loading') {{
                         document.addEventListener('DOMContentLoaded', applyGradients);
                     }}
-                    setTimeout(applyGradients, 100);
-                    setTimeout(applyGradients, 500);
                     
-                    const observer = new MutationObserver(applyGradients);
-                    observer.observe(document.body, {{ childList: true, subtree: true }});
+                    // 여러 번 시도 (Streamlit 렌더링 지연 대응)
+                    setTimeout(applyGradients, 100);
+                    setTimeout(applyGradients, 300);
+                    setTimeout(applyGradients, 500);
+                    setTimeout(applyGradients, 1000);
+                    setTimeout(applyGradients, 2000);
+                    
+                    // MutationObserver로 DOM 변경 감지
+                    const observer = new MutationObserver(function(mutations) {{
+                        applyGradients();
+                    }});
+                    
+                    try {{
+                        observer.observe(document.body, {{ 
+                            childList: true, 
+                            subtree: true,
+                            characterData: true,
+                            attributes: true
+                        }});
+                    }} catch(e) {{
+                        console.log('Observer 오류:', e);
+                    }}
                 }})();
                 </script>
                 """, unsafe_allow_html=True)
