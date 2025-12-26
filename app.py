@@ -1341,9 +1341,18 @@ with tab2:
                         tx = buy_txs[i] if i < len(buy_txs) else None
                         price = float(tx.get('price', 0)) if tx and tx.get('price') else 0.0
                         estimated_qty = int(amount_per_installment / price) if price > 0 else 0
+                        
+                        # 날짜를 datetime으로 변환 (달력 입력을 위해)
+                        date_val = None
+                        if tx and tx.get('date'):
+                            try:
+                                date_val = pd.to_datetime(tx.get('date')).date()
+                            except:
+                                date_val = None
+                        
                         buy_data.append({
                             '회차': i + 1,
-                            '날짜': tx.get('date', '') if tx and tx.get('date') else '',
+                            '날짜': date_val,
                             '목표액': f"{amount_per_installment:,.0f}원",
                             '매수가': price,
                             '예상': f"{estimated_qty:,}" if estimated_qty > 0 else '-',
@@ -1352,6 +1361,15 @@ with tab2:
                     
                     buy_df = pd.DataFrame(buy_data)
                     
+                    # 예상 수량을 계산하여 buy_df에 미리 반영
+                    for i in range(len(buy_df)):
+                        price = float(buy_df.iloc[i]['매수가']) if pd.notna(buy_df.iloc[i]['매수가']) else 0.0
+                        if price > 0:
+                            estimated_qty = int(amount_per_installment / price)
+                            buy_df.iloc[i, buy_df.columns.get_loc('예상')] = f"{estimated_qty:,}"
+                        else:
+                            buy_df.iloc[i, buy_df.columns.get_loc('예상')] = '-'
+                    
                     # 편집 가능한 테이블 (날짜, 매수가, 매수량만 편집 가능)
                     edited_df = st.data_editor(
                         buy_df,
@@ -1359,7 +1377,7 @@ with tab2:
                         hide_index=True,
                         column_config={
                             '회차': st.column_config.NumberColumn('회차', disabled=True),
-                            '날짜': st.column_config.TextColumn('날짜', width="medium", help="YYYY-MM-DD 형식으로 입력하세요"),
+                            '날짜': st.column_config.DateColumn('날짜', width="medium", format="YYYY-MM-DD"),
                             '목표액': st.column_config.TextColumn('목표액', disabled=True),
                             '매수가': st.column_config.NumberColumn('매수가 (원)', min_value=0.0, step=100.0, format="%.0f"),
                             '예상': st.column_config.TextColumn('예상', disabled=True),
@@ -1369,14 +1387,29 @@ with tab2:
                         num_rows="fixed"
                     )
                     
-                    # 예상 수량 자동 계산 및 표시 업데이트
+                    # 매수가 변경 시 예상 수량 자동 계산 및 업데이트
+                    # edited_df의 매수가를 기반으로 예상 수량 재계산
+                    updated_buy_df = edited_df.copy()
                     for i in range(len(edited_df)):
                         price = float(edited_df.iloc[i]['매수가']) if pd.notna(edited_df.iloc[i]['매수가']) else 0.0
                         if price > 0:
                             estimated_qty = int(amount_per_installment / price)
-                            edited_df.iloc[i, edited_df.columns.get_loc('예상')] = f"{estimated_qty:,}"
+                            updated_buy_df.iloc[i, updated_buy_df.columns.get_loc('예상')] = f"{estimated_qty:,}"
                         else:
-                            edited_df.iloc[i, edited_df.columns.get_loc('예상')] = '-'
+                            updated_buy_df.iloc[i, updated_buy_df.columns.get_loc('예상')] = '-'
+                    
+                    # 예상 수량이 업데이트된 테이블 표시 (읽기 전용, 정보 확인용)
+                    # 매수가가 변경되었는지 확인하여 예상 수량 업데이트
+                    if not updated_buy_df.equals(buy_df):
+                        # 예상 수량이 변경된 경우 업데이트된 버전 표시
+                        st.dataframe(
+                            updated_buy_df[['회차', '날짜', '목표액', '매수가', '예상', '매수량']],
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        st.caption("💡 매수가를 입력하면 예상 수량이 자동으로 계산됩니다. 저장 버튼을 눌러 저장하세요.")
+                    else:
+                        st.caption("💡 매수가를 입력하면 예상 수량이 자동으로 계산됩니다.")
                     
                     # 저장 버튼
                     if st.button("💾 저장", key=f"save_buy_{stock_id}", type="primary"):
@@ -1387,20 +1420,24 @@ with tab2:
                         # 편집된 데이터를 buy_txs에 반영
                         for i in range(installments):
                             row = edited_df.iloc[i]
-                            date_str = str(row['날짜']).strip() if pd.notna(row['날짜']) else ''
+                            
+                            # 날짜 처리 (datetime.date 객체 또는 문자열)
+                            date_str = ''
+                            if pd.notna(row['날짜']):
+                                if isinstance(row['날짜'], (pd.Timestamp, datetime)):
+                                    date_str = row['날짜'].strftime("%Y-%m-%d")
+                                elif isinstance(row['날짜'], str):
+                                    try:
+                                        parsed_date = pd.to_datetime(row['날짜'])
+                                        date_str = parsed_date.strftime("%Y-%m-%d")
+                                    except:
+                                        date_str = str(row['날짜']).strip()
+                                else:
+                                    # date 객체인 경우
+                                    date_str = str(row['날짜'])
+                            
                             price = float(row['매수가']) if pd.notna(row['매수가']) and row['매수가'] > 0 else 0.0
                             quantity = int(row['매수량']) if pd.notna(row['매수량']) and row['매수량'] > 0 else 0
-                            
-                            # 날짜 형식 검증 및 정규화
-                            if date_str:
-                                try:
-                                    # YYYY-MM-DD 형식으로 변환 시도
-                                    parsed_date = pd.to_datetime(date_str)
-                                    date_str = parsed_date.strftime("%Y-%m-%d")
-                                except:
-                                    # 날짜 형식이 잘못된 경우 경고
-                                    st.warning(f"회차 {i+1}의 날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.")
-                                    continue
                             
                             # 데이터가 있는 경우 저장
                             if date_str or price > 0 or quantity > 0:
@@ -1422,14 +1459,19 @@ with tab2:
                 with col_sell:
                     st.subheader("분할 매도 기록")
                     
-                    # 매도 기록 입력
-                    with st.form(f"sell_form_{stock_id}"):
-                        st.caption(f"{stock_name} 매도 기록")
-                        sell_date = st.date_input("날짜", datetime.now(), key=f"sell_date_{stock_id}")
-                        sell_price = st.number_input("매도가 (원)", min_value=0, step=100, key=f"sell_price_{stock_id}")
-                        sell_qty = st.number_input("매도 수량 (주)", min_value=1, step=1, key=f"sell_qty_{stock_id}")
-                        
-                        if st.form_submit_button("추가"):
+                    # 매도 기록 간결한 입력 (한 줄)
+                    st.caption(f"{stock_name} 매도 기록")
+                    col_sell_input1, col_sell_input2, col_sell_input3, col_sell_input4 = st.columns([2, 2, 2, 1])
+                    
+                    with col_sell_input1:
+                        sell_date = st.date_input("날짜", datetime.now(), key=f"sell_date_{stock_id}", label_visibility="collapsed")
+                    with col_sell_input2:
+                        sell_price = st.number_input("매도가 (원)", min_value=0, step=100, key=f"sell_price_{stock_id}", label_visibility="collapsed", placeholder="매도 가격")
+                    with col_sell_input3:
+                        sell_qty = st.number_input("매도 수량 (주)", min_value=1, step=1, key=f"sell_qty_{stock_id}", label_visibility="collapsed", placeholder="매도 수량")
+                    with col_sell_input4:
+                        st.write("")  # 공간 확보
+                        if st.button("추가", key=f"add_sell_{stock_id}", type="primary"):
                             new_sell = {
                                 'id': f"{datetime.now().timestamp()}",
                                 'date': str(sell_date),
