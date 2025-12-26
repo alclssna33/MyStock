@@ -1461,87 +1461,86 @@ with tab2:
                             existing_price = float(tx.get('price', 0)) if tx.get('price') else 0.0
                             existing_qty = int(tx.get('quantity', 0)) if tx.get('quantity') else 0
                         
-                        # 카드 형태로 각 행 표시 (간격 제거)
-                        with st.container():
-                            st.markdown(f"""
-                            <div style="
-                                background: rgba(255, 255, 255, 0.05);
-                                border-radius: 10px;
-                                padding: 1rem;
-                                margin-bottom: 0.2rem;
-                                border: 1px solid rgba(255, 255, 255, 0.1);
-                            ">
-                            """, unsafe_allow_html=True)
+                        # 카드 형태로 각 행 표시 (간격 최소화)
+                        st.markdown(f"""
+                        <div style="
+                            background: rgba(255, 255, 255, 0.05);
+                            border-radius: 8px;
+                            padding: 0.5rem 1rem;
+                            margin-bottom: 0;
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                        ">
+                        """, unsafe_allow_html=True)
+                        
+                        # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 매수량 | 실행
+                        col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 1.2, 0.8])
+                        
+                        with col_round:
+                            st.markdown(f"<div style='text-align: center; font-size: 1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
+                        
+                        with col_date:
+                            buy_date = st.date_input(
+                                "날짜",
+                                value=existing_date if existing_date else datetime.now().date(),
+                                key=f"buy_date_{stock_id}_{i}",
+                                label_visibility="collapsed"
+                            )
+                        
+                        with col_target:
+                            st.markdown(f"<div style='text-align: center; color: #9ca3af;'>₩{amount_per_installment:,.0f}</div>", unsafe_allow_html=True)
                             
-                            # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 매수량 | 실행
-                            col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 1.2, 0.8])
+                        with col_price:
+                            buy_price = st.number_input(
+                                "매수가",
+                                min_value=0,
+                                value=int(existing_price) if existing_price > 0 else 0,
+                                step=100,
+                                key=f"buy_price_{stock_id}_{i}",
+                                label_visibility="collapsed",
+                                placeholder="가격",
+                                format="%d"
+                            )
+                        
+                        with col_qty:
+                            buy_qty = st.number_input(
+                                "매수량",
+                                min_value=0,
+                                value=existing_qty,
+                                step=1,
+                                key=f"buy_qty_{stock_id}_{i}",
+                                label_visibility="collapsed",
+                                placeholder="수량"
+                            )
+                        
+                        with col_action:
+                            # 수정/기록 버튼
+                            if existing_date or existing_price > 0 or existing_qty > 0:
+                                button_label = "수정"
+                            else:
+                                button_label = "기록"
                             
-                            with col_round:
-                                st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-size: 1.1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
-                            
-                            with col_date:
-                                buy_date = st.date_input(
-                                    "날짜",
-                                    value=existing_date if existing_date else datetime.now().date(),
-                                    key=f"buy_date_{stock_id}_{i}",
-                                    label_visibility="collapsed"
-                                )
-                            
-                            with col_target:
-                                st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; color: #9ca3af;'>₩{amount_per_installment:,.0f}</div>", unsafe_allow_html=True)
-                            
-                            with col_price:
-                                buy_price = st.number_input(
-                                    "매수가",
-                                    min_value=0,
-                                    value=int(existing_price) if existing_price > 0 else 0,
-                                    step=100,
-                                    key=f"buy_price_{stock_id}_{i}",
-                                    label_visibility="collapsed",
-                                    placeholder="가격",
-                                    format="%d"
-                                )
-                            
-                            with col_qty:
-                                buy_qty = st.number_input(
-                                    "매수량",
-                                    min_value=0,
-                                    value=existing_qty,
-                                    step=1,
-                                    key=f"buy_qty_{stock_id}_{i}",
-                                    label_visibility="collapsed",
-                                    placeholder="수량"
-                                )
-                            
-                            with col_action:
-                                # 수정/기록 버튼
-                                if existing_date or existing_price > 0 or existing_qty > 0:
-                                    button_label = "수정"
-                                else:
-                                    button_label = "기록"
+                            if st.button(button_label, key=f"save_buy_row_{stock_id}_{i}", type="primary", use_container_width=True):
+                                # buy_txs 리스트 확장
+                                while len(buy_txs) < installments:
+                                    buy_txs.append(None)
                                 
-                                if st.button(button_label, key=f"save_buy_row_{stock_id}_{i}", type="primary", use_container_width=True):
-                                    # buy_txs 리스트 확장
-                                    while len(buy_txs) < installments:
-                                        buy_txs.append(None)
+                                # 데이터 저장
+                                if buy_date and buy_price > 0 and buy_qty > 0:
+                                    buy_txs[i] = {
+                                        'date': str(buy_date),
+                                        'price': int(buy_price),  # 정수로 저장
+                                        'quantity': int(buy_qty)
+                                    }
                                     
-                                    # 데이터 저장
-                                    if buy_date and buy_price > 0 and buy_qty > 0:
-                                        buy_txs[i] = {
-                                            'date': str(buy_date),
-                                            'price': int(buy_price),  # 정수로 저장
-                                            'quantity': int(buy_qty)
-                                        }
-                                        
-                                        # 구글 스프레드시트에 저장
-                                        df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
-                                        save_split_purchase_data(df_split)
-                                        st.success(f"회차 {i+1} 매수 기록이 저장되었습니다!")
-                                        st.rerun()
-                                    else:
-                                        st.warning("날짜, 매수가, 매수량을 모두 입력해주세요.")
-                            
-                            st.markdown("</div>", unsafe_allow_html=True)
+                                    # 구글 스프레드시트에 저장
+                                    df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
+                                    save_split_purchase_data(df_split)
+                                    st.success(f"회차 {i+1} 매수 기록이 저장되었습니다!")
+                                    st.rerun()
+                                else:
+                                    st.warning("날짜, 매수가, 매수량을 모두 입력해주세요.")
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
                 
                 with col_sell:
                     st.subheader("분할 매도 기록")
@@ -1583,8 +1582,8 @@ with tab2:
                         <div style="
                             background: rgba(99, 102, 241, 0.2);
                             border-radius: 8px;
-                            padding: 0.8rem;
-                            margin-bottom: 0.5rem;
+                            padding: 0.5rem 0.8rem;
+                            margin-bottom: 0.2rem;
                             border: 1px solid rgba(99, 102, 241, 0.3);
                         ">
                         <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
@@ -1613,50 +1612,49 @@ with tab2:
                                     except:
                                         tx_date = datetime.now().date()
                                 
-                                # 카드 형태로 각 행 표시 (간격 제거)
-                                with st.container():
-                                    st.markdown(f"""
-                                    <div style="
-                                        background: rgba(255, 255, 255, 0.05);
-                                        border-radius: 10px;
-                                        padding: 1rem;
-                                        margin-bottom: 0.2rem;
-                                        border: 1px solid rgba(255, 255, 255, 0.1);
-                                    ">
-                                    """, unsafe_allow_html=True)
-                                    
-                                    # 행 레이아웃: 회차 | 날짜 | 매도가 | 수량 | 수익률 | 수익금 | 실행
-                                    col_round, col_date, col_price, col_qty, col_yield, col_profit, col_action = st.columns([0.5, 1.2, 1.2, 1.2, 1.0, 1.2, 0.8])
-                                    
-                                    with col_round:
-                                        st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-size: 1.1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
-                                    
-                                    with col_date:
-                                        st.markdown(f"<div style='text-align: center; padding-top: 0.8rem;'>{tx_date.strftime('%Y-%m-%d') if tx_date else tx.get('date', '')}</div>", unsafe_allow_html=True)
-                                    
-                                    with col_price:
-                                        st.markdown(f"<div style='text-align: center; padding-top: 0.8rem;'>{tx.get('price', 0):,.0f}</div>", unsafe_allow_html=True)
-                                    
-                                    with col_qty:
-                                        st.markdown(f"<div style='text-align: center; padding-top: 0.8rem;'>{tx.get('quantity', 0):,}</div>", unsafe_allow_html=True)
-                                    
-                                    with col_yield:
-                                        yield_color = "#ef4444" if yield_pct < 0 else "#10b981"
-                                        st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; color: {yield_color}; font-weight: 600;'>{yield_pct:.2f}%</div>", unsafe_allow_html=True)
-                                    
-                                    with col_profit:
-                                        profit_color = "#ef4444" if profit < 0 else "#10b981"
-                                        st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; color: {profit_color}; font-weight: 600;'>{profit:,.0f}</div>", unsafe_allow_html=True)
-                                    
-                                    with col_action:
-                                        if st.button("삭제", key=f"delete_sell_{stock_id}_{i}", type="primary", use_container_width=True):
-                                            sell_txs.pop(i)
-                                            df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
-                                            save_split_purchase_data(df_split)
-                                            st.success("매도 기록이 삭제되었습니다!")
-                                            st.rerun()
-                                    
-                                    st.markdown("</div>", unsafe_allow_html=True)
+                                # 카드 형태로 각 행 표시 (간격 최소화)
+                                st.markdown(f"""
+                                <div style="
+                                    background: rgba(255, 255, 255, 0.05);
+                                    border-radius: 8px;
+                                    padding: 0.5rem 1rem;
+                                    margin-bottom: 0;
+                                    border: 1px solid rgba(255, 255, 255, 0.1);
+                                ">
+                                """, unsafe_allow_html=True)
+                                
+                                # 행 레이아웃: 회차 | 날짜 | 매도가 | 수량 | 수익률 | 수익금 | 실행
+                                col_round, col_date, col_price, col_qty, col_yield, col_profit, col_action = st.columns([0.5, 1.2, 1.2, 1.2, 1.0, 1.2, 0.8])
+                                
+                                with col_round:
+                                    st.markdown(f"<div style='text-align: center; font-size: 1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
+                                
+                                with col_date:
+                                    st.markdown(f"<div style='text-align: center;'>{tx_date.strftime('%Y-%m-%d') if tx_date else tx.get('date', '')}</div>", unsafe_allow_html=True)
+                                
+                                with col_price:
+                                    st.markdown(f"<div style='text-align: center;'>{tx.get('price', 0):,.0f}</div>", unsafe_allow_html=True)
+                                
+                                with col_qty:
+                                    st.markdown(f"<div style='text-align: center;'>{tx.get('quantity', 0):,}</div>", unsafe_allow_html=True)
+                                
+                                with col_yield:
+                                    yield_color = "#ef4444" if yield_pct < 0 else "#10b981"
+                                    st.markdown(f"<div style='text-align: center; color: {yield_color}; font-weight: 600;'>{yield_pct:.2f}%</div>", unsafe_allow_html=True)
+                                
+                                with col_profit:
+                                    profit_color = "#ef4444" if profit < 0 else "#10b981"
+                                    st.markdown(f"<div style='text-align: center; color: {profit_color}; font-weight: 600;'>{profit:,.0f}</div>", unsafe_allow_html=True)
+                                
+                                with col_action:
+                                    if st.button("삭제", key=f"delete_sell_{stock_id}_{i}", type="primary", use_container_width=True):
+                                        sell_txs.pop(i)
+                                        df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
+                                        save_split_purchase_data(df_split)
+                                        st.success("매도 기록이 삭제되었습니다!")
+                                        st.rerun()
+                                
+                                st.markdown("</div>", unsafe_allow_html=True)
                     else:
                         st.info("매도 기록이 없습니다.")
                 
