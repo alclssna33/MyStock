@@ -455,124 +455,124 @@ with tab1:
     
     df = load_stocks()
 
-if df.empty:
-    st.info("사이드바에서 종목을 추가해주세요.")
-else:
-    # 상단 컨트롤 바 (5단 구성)
-    col1, col2, col3, col4, col5 = st.columns([1, 1.5, 0.8, 0.8, 1])
-    
-    with col1:
-        # 카테고리 선택 (매수종목 / 관심종목)
-        category = st.radio(
-            "카테고리",
-            options=["전체", "매수종목", "관심종목"],
-            index=0,
-            key="category_select",
-            horizontal=True
-        )
-    
-    with col2:
-        # 종목 선택
-        stock_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df.iterrows()]
+    if df.empty:
+        st.info("사이드바에서 종목을 추가해주세요.")
+    else:
+        # 상단 컨트롤 바 (5단 구성)
+        col1, col2, col3, col4, col5 = st.columns([1, 1.5, 0.8, 0.8, 1])
         
-        # 카테고리 필터링
-        if category == "매수종목":
-            filtered_options = []
-            for idx, row in df.iterrows():
-                # BuyDate1~10 중 하나라도 있으면 매수종목
-                has_buy_date = False
-                for i in range(1, 11):
-                    if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
-                        has_buy_date = True
-                        break
-                if has_buy_date:
-                    filtered_options.append(f"{row['Name']} ({row['Symbol']})")
-            if filtered_options:
-                stock_options = filtered_options
-        elif category == "관심종목":
-            filtered_options = []
-            for idx, row in df.iterrows():
-                # BuyDate1~10이 모두 비어있고 InterestDate가 있으면 관심종목
-                has_buy_date = False
-                for i in range(1, 11):
-                    if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
-                        has_buy_date = True
-                        break
-                if not has_buy_date and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
-                    filtered_options.append(f"{row['Name']} ({row['Symbol']})")
-            if filtered_options:
-                stock_options = filtered_options
+        with col1:
+            # 카테고리 선택 (매수종목 / 관심종목)
+            category = st.radio(
+                "카테고리",
+                options=["전체", "매수종목", "관심종목"],
+                index=0,
+                key="category_select",
+                horizontal=True
+            )
         
-        # 가나다순 정렬
-        stock_options = sorted(stock_options)
-        
-        selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
-    
-    with col3:
-        # 시작일
-        start_date = st.date_input(
-            "시작일",
-            value=None,
-            key="start_date"
-        )
-    
-    with col4:
-        # 종료일
-        end_date = st.date_input(
-            "종료일",
-            value=None,
-            key="end_date"
-        )
-    
-    with col5:
-        # 기간선택 박스
-        period_options = {
-            "6개월": 0.5,
-            "1년": 1,
-            "5년": 5,
-            "10년": 10,
-            "15년": 15
-        }
-        selected_period = st.selectbox(
-            "기간선택",
-            options=["선택안함"] + list(period_options.keys()),
-            index=0,
-            key="period_select"
-        )
-    
-    if selected_stock:
-        # 원본 df에서 선택된 종목 찾기
-        selected_name_symbol = selected_stock
-        selected_row = None
-        for idx, row in df.iterrows():
-            if f"{row['Name']} ({row['Symbol']})" == selected_name_symbol:
-                selected_row = row
-                break
-        
-        if selected_row is not None:
-            symbol = selected_row['Symbol']
-            name = selected_row['Name']
-            interest_date = selected_row.get('InterestDate', '')
-            note = selected_row.get('Note', '')
+        with col2:
+            # 종목 선택
+            stock_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df.iterrows()]
             
-            # BuyDate1~10, SellDate1~10 읽기
-            buy_dates = []
-            sell_dates = []
-            for i in range(1, 11):
-                buy_date_val = selected_row.get(f'BuyDate{i}', '')
-                if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
-                    buy_dates.append(str(buy_date_val).strip())
-                else:
-                    buy_dates.append("")
-                sell_date_val = selected_row.get(f'SellDate{i}', '')
-                if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
-                    sell_dates.append(str(sell_date_val).strip())
-                else:
-                    sell_dates.append("")
+            # 카테고리 필터링
+            if category == "매수종목":
+                filtered_options = []
+                for idx, row in df.iterrows():
+                    # BuyDate1~10 중 하나라도 있으면 매수종목
+                    has_buy_date = False
+                    for i in range(1, 11):
+                        if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
+                            has_buy_date = True
+                            break
+                    if has_buy_date:
+                        filtered_options.append(f"{row['Name']} ({row['Symbol']})")
+                if filtered_options:
+                    stock_options = filtered_options
+            elif category == "관심종목":
+                filtered_options = []
+                for idx, row in df.iterrows():
+                    # BuyDate1~10이 모두 비어있고 InterestDate가 있으면 관심종목
+                    has_buy_date = False
+                    for i in range(1, 11):
+                        if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
+                            has_buy_date = True
+                            break
+                    if not has_buy_date and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
+                        filtered_options.append(f"{row['Name']} ({row['Symbol']})")
+                if filtered_options:
+                    stock_options = filtered_options
             
-            # 정보 수정하기 (상단 컨트롤 바 아래 별도 영역)
-            with st.container():
-                st.markdown("""
+            # 가나다순 정렬
+            stock_options = sorted(stock_options)
+            
+            selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
+        
+        with col3:
+            # 시작일
+            start_date = st.date_input(
+                "시작일",
+                value=None,
+                key="start_date"
+            )
+        
+        with col4:
+            # 종료일
+            end_date = st.date_input(
+                "종료일",
+                value=None,
+                key="end_date"
+            )
+        
+        with col5:
+            # 기간선택 박스
+            period_options = {
+                "6개월": 0.5,
+                "1년": 1,
+                "5년": 5,
+                "10년": 10,
+                "15년": 15
+            }
+            selected_period = st.selectbox(
+                "기간선택",
+                options=["선택안함"] + list(period_options.keys()),
+                index=0,
+                key="period_select"
+            )
+        
+        if selected_stock:
+            # 원본 df에서 선택된 종목 찾기
+            selected_name_symbol = selected_stock
+            selected_row = None
+            for idx, row in df.iterrows():
+                if f"{row['Name']} ({row['Symbol']})" == selected_name_symbol:
+                    selected_row = row
+                    break
+            
+            if selected_row is not None:
+                symbol = selected_row['Symbol']
+                name = selected_row['Name']
+                interest_date = selected_row.get('InterestDate', '')
+                note = selected_row.get('Note', '')
+                
+                # BuyDate1~10, SellDate1~10 읽기
+                buy_dates = []
+                sell_dates = []
+                for i in range(1, 11):
+                    buy_date_val = selected_row.get(f'BuyDate{i}', '')
+                    if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
+                        buy_dates.append(str(buy_date_val).strip())
+                    else:
+                        buy_dates.append("")
+                    sell_date_val = selected_row.get(f'SellDate{i}', '')
+                    if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
+                        sell_dates.append(str(sell_date_val).strip())
+                    else:
+                        sell_dates.append("")
+                
+                # 정보 수정하기 (상단 컨트롤 바 아래 별도 영역)
+                with st.container():
+                    st.markdown("""
                 <style>
                 .edit-container {
                     background: rgba(255, 255, 255, 0.05);
@@ -624,8 +624,8 @@ else:
                 observer.observe(document.body, { childList: true, subtree: true });
                 </script>
                 </style>
-                """, unsafe_allow_html=True)
-                with st.expander("📝 정보 수정하기", expanded=False):
+                    """, unsafe_allow_html=True)
+                    with st.expander("📝 정보 수정하기", expanded=False):
                     # 날짜 데이터 변환 (문자열 -> date 객체)
                     def parse_date(date_str):
                         if pd.notna(date_str) and date_str != "":
@@ -789,310 +789,310 @@ else:
                             save_stocks(df_stocks)
                             st.success("수정되었습니다!")
                             st.rerun()
-            
-            # 주가 데이터 가져오기
-            with st.spinner(f"{name} ({symbol}) 데이터를 불러오는 중..."):
-                stock_data_full = get_stock_data(symbol)
-            
-            if stock_data_full is not None and not stock_data_full.empty:
-                # 기간선택 박스로 시작일/종료일 자동 설정
-                if selected_period and selected_period != "선택안함":
-                    period_years = period_options[selected_period]
-                    max_date = stock_data_full.index.max()
-                    min_date = max_date - timedelta(days=int(period_years * 365))
-                    # 기간선택 시 시작일/종료일 자동 계산
-                    calculated_start_date = min_date.date()
-                    calculated_end_date = max_date.date()
-                else:
-                    calculated_start_date = start_date
-                    calculated_end_date = end_date
                 
-                # 시작일/종료일에 맞춰 데이터 필터링
-                stock_data = stock_data_full.copy()
+                # 주가 데이터 가져오기
+                with st.spinner(f"{name} ({symbol}) 데이터를 불러오는 중..."):
+                    stock_data_full = get_stock_data(symbol)
                 
-                # 기간선택이 있으면 계산된 날짜 사용, 없으면 사용자 입력 날짜 사용
-                filter_start_date = calculated_start_date if (selected_period and selected_period != "선택안함") else start_date
-                filter_end_date = calculated_end_date if (selected_period and selected_period != "선택안함") else end_date
-                
-                if filter_start_date is not None:
-                    start_dt = pd.to_datetime(filter_start_date).normalize()
-                    stock_data = stock_data[stock_data.index >= start_dt].copy()
-                
-                if filter_end_date is not None:
-                    end_dt = pd.to_datetime(filter_end_date).normalize()
-                    stock_data = stock_data[stock_data.index <= end_dt].copy()
-                
-                # 시작일/종료일이 모두 없으면 기본 5년
-                if filter_start_date is None and filter_end_date is None:
-                    cutoff_date = stock_data_full.index.max() - timedelta(days=5 * 365)
-                    stock_data = stock_data_full[stock_data_full.index >= cutoff_date].copy()
-                
-                # 캔들스틱 차트 생성
-                fig = go.Figure()
-                
-                # 캔들스틱 차트 추가 (한국 스타일 색상)
-                fig.add_trace(go.Candlestick(
-                    x=stock_data.index,
-                    open=stock_data['Open'],
-                    high=stock_data['High'],
-                    low=stock_data['Low'],
-                    close=stock_data['Close'],
-                    name="주가",
-                    increasing=dict(
-                        line=dict(color='#FF2E2E'),  # 상승: 빨강
-                        fillcolor='#FF2E2E'
-                    ),
-                    decreasing=dict(
-                        line=dict(color='#00C4FF'),  # 하락: 파랑
-                        fillcolor='#00C4FF'
-                    )
-                ))
-                
-                # 날짜별 주석 추가
-                annotations = []
-                sell_dates = []
-                sell_prices = []
-                
-                # 날짜 문자열을 datetime으로 변환하고 정규화하는 함수
-                def parse_date_safe(date_str):
-                    if pd.isna(date_str) or date_str == "" or str(date_str).strip() == "":
-                        return None
-                    try:
-                        # 문자열을 datetime으로 변환하고 날짜만 남기기 (시간 정보 제거)
-                        date_dt = pd.to_datetime(date_str).normalize()
-                        return date_dt
-                    except Exception as e:
-                        return None
-                
-                # 날짜에 해당하는 마커를 찾는 함수 (주말/휴장일이면 다음 거래일 사용)
-                def find_trading_date(target_date, data_index):
-                    """
-                    target_date에 해당하는 거래일을 찾습니다.
-                    주말/휴장일이면 다음 거래일(bfill)을 반환합니다.
-                    """
-                    if len(data_index) == 0:
-                        return None
+                if stock_data_full is not None and not stock_data_full.empty:
+                    # 기간선택 박스로 시작일/종료일 자동 설정
+                    if selected_period and selected_period != "선택안함":
+                        period_years = period_options[selected_period]
+                        max_date = stock_data_full.index.max()
+                        min_date = max_date - timedelta(days=int(period_years * 365))
+                        # 기간선택 시 시작일/종료일 자동 계산
+                        calculated_start_date = min_date.date()
+                        calculated_end_date = max_date.date()
+                    else:
+                        calculated_start_date = start_date
+                        calculated_end_date = end_date
                     
-                    # 정규화된 날짜로 변환
-                    target_date = pd.to_datetime(target_date).normalize()
+                    # 시작일/종료일에 맞춰 데이터 필터링
+                    stock_data = stock_data_full.copy()
                     
-                    # 정확히 일치하는 날짜가 있는지 확인
-                    if target_date in data_index:
-                        return target_date
+                    # 기간선택이 있으면 계산된 날짜 사용, 없으면 사용자 입력 날짜 사용
+                    filter_start_date = calculated_start_date if (selected_period and selected_period != "선택안함") else start_date
+                    filter_end_date = calculated_end_date if (selected_period and selected_period != "선택안함") else end_date
                     
-                    # 정확히 일치하지 않으면 다음 거래일 찾기 (bfill)
-                    # target_date 이후의 데이터만 필터링
-                    future_dates = data_index[data_index >= target_date]
-                    if len(future_dates) > 0:
-                        # 다음 거래일 반환
-                        return future_dates[0]
+                    if filter_start_date is not None:
+                        start_dt = pd.to_datetime(filter_start_date).normalize()
+                        stock_data = stock_data[stock_data.index >= start_dt].copy()
                     
-                    # target_date 이전의 가장 가까운 날짜 찾기 (fallback)
-                    past_dates = data_index[data_index <= target_date]
-                    if len(past_dates) > 0:
-                        return past_dates[-1]
+                    if filter_end_date is not None:
+                        end_dt = pd.to_datetime(filter_end_date).normalize()
+                        stock_data = stock_data[stock_data.index <= end_dt].copy()
                     
-                    return None
-                
-                # 관심일 표시 (네온 노란색 화살표 - 아래 방향)
-                interest_dt = parse_date_safe(interest_date)
-                if interest_dt is not None:
-                    try:
-                        if len(stock_data.index) > 0:
-                            # 거래일 찾기
-                            trading_date = find_trading_date(interest_dt, stock_data.index)
-                            if trading_date is not None and trading_date in stock_data.index:
-                                price = stock_data.loc[trading_date, 'High']
-                                # 가격 범위 계산 (텍스트 위치)
-                                price_range = stock_data['High'].max() - stock_data['Low'].min()
-                                offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
-                                text_y = price + offset  # 텍스트 위치
-                                annotations.append(dict(
-                                    x=trading_date,
-                                    y=text_y,  # 텍스트는 위에
-                                    xref="x",
-                                    yref="y",
-                                    text="👀 관심",
-                                    showarrow=True,
-                                    arrowhead=2,
-                                    arrowcolor="#FFD700",  # 네온 노란색
-                                    arrowsize=1.5,
-                                    arrowwidth=2,
-                                    ax=0,
-                                    ay=-70,  # 고정값: 위로 70픽셀
-                                    bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
-                                    bordercolor="#FFD700",
-                                    borderwidth=2,
-                                    font=dict(size=14, color="#FFD700")  # 텍스트 크기 증가
-                                ))
-                    except Exception as e:
-                        pass
-                
-                # 매수일 표시 (네온 빨간색 화살표 - 위 방향) - 여러 개 표시
-                for i in range(1, 11):
-                    buy_date_val = selected_row.get(f'BuyDate{i}', '')
-                    if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
-                        buy_dt = parse_date_safe(buy_date_val)
-                        if buy_dt is not None:
-                            try:
-                                if len(stock_data.index) > 0:
-                                    trading_date = find_trading_date(buy_dt, stock_data.index)
-                                    if trading_date is not None and trading_date in stock_data.index:
-                                        price = stock_data.loc[trading_date, 'Low']
-                                        # 가격 범위 계산 (텍스트 위치)
-                                        price_range = stock_data['High'].max() - stock_data['Low'].min()
-                                        offset = price_range * 0.01  # 가격 범위의 1%만큼 아래로
-                                        text_y = price - offset  # 텍스트 위치
-                                        text_label = "🔴 매수" if i == 1 else f"🔴 매수{i}"
-                                        annotations.append(dict(
-                                            x=trading_date,
-                                            y=text_y,  # 텍스트는 아래에
-                                            xref="x",
-                                            yref="y",
-                                            text=text_label,
-                                            showarrow=True,
-                                            arrowhead=2,
-                                            arrowcolor="#FF2E2E",  # 네온 빨간색
-                                            arrowsize=1.5,
-                                            arrowwidth=2,
-                                            ax=0,
-                                            ay=70,  # 고정값: 아래로 70픽셀
-                                            bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
-                                            bordercolor="#FF2E2E",
-                                            borderwidth=2,
-                                            font=dict(size=14, color="#FF2E2E")  # 텍스트 크기 증가
-                                        ))
-                            except Exception as e:
-                                pass
-                
-                # 매도일 표시 (네온 하늘색 화살표 - 아래 방향) - 여러 개 표시
-                for i in range(1, 11):
-                    sell_date_val = selected_row.get(f'SellDate{i}', '')
-                    if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
-                        sell_dt = parse_date_safe(sell_date_val)
-                        if sell_dt is not None:
-                            try:
-                                if len(stock_data.index) > 0:
-                                    trading_date = find_trading_date(sell_dt, stock_data.index)
-                                    if trading_date is not None and trading_date in stock_data.index:
-                                        price = stock_data.loc[trading_date, 'High']
-                                        # 가격 범위 계산 (텍스트 위치)
-                                        price_range = stock_data['High'].max() - stock_data['Low'].min()
-                                        offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
-                                        text_y = price + offset  # 텍스트 위치
-                                        sell_dates.append(trading_date)
-                                        sell_prices.append(price)
-                                        text_label = "🔵 매도" if i == 1 else f"🔵 매도{i}"
-                                        annotations.append(dict(
-                                            x=trading_date,
-                                            y=text_y,  # 텍스트는 위에
-                                            xref="x",
-                                            yref="y",
-                                            text=text_label,
-                                            showarrow=True,  # 화살표 추가
-                                            arrowhead=2,
-                                            arrowcolor="#00C4FF",  # 네온 하늘색
-                                            arrowsize=1.5,
-                                            arrowwidth=2,
-                                            ax=0,
-                                            ay=-70,  # 고정값: 위로 70픽셀
-                                            bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
-                                            bordercolor="#00C4FF",
-                                            borderwidth=2,
-                                            font=dict(size=14, color="#00C4FF"),  # 텍스트 크기 증가
-                                            yshift=10
-                                        ))
-                            except Exception as e:
-                                pass
-                
-                # 매도일 점 마커 추가 (네온 하늘색)
-                if sell_dates:
-                    fig.add_trace(go.Scatter(
-                        x=sell_dates,
-                        y=sell_prices,
-                        mode='markers',
-                        marker=dict(
-                            symbol='circle',
-                            size=18,  # 크기 증가
-                            color='#00C4FF',  # 네온 하늘색
-                            line=dict(width=2, color='#0088CC')
+                    # 시작일/종료일이 모두 없으면 기본 5년
+                    if filter_start_date is None and filter_end_date is None:
+                        cutoff_date = stock_data_full.index.max() - timedelta(days=5 * 365)
+                        stock_data = stock_data_full[stock_data_full.index >= cutoff_date].copy()
+                    
+                    # 캔들스틱 차트 생성
+                    fig = go.Figure()
+                    
+                    # 캔들스틱 차트 추가 (한국 스타일 색상)
+                    fig.add_trace(go.Candlestick(
+                        x=stock_data.index,
+                        open=stock_data['Open'],
+                        high=stock_data['High'],
+                        low=stock_data['Low'],
+                        close=stock_data['Close'],
+                        name="주가",
+                        increasing=dict(
+                            line=dict(color='#FF2E2E'),  # 상승: 빨강
+                            fillcolor='#FF2E2E'
                         ),
-                        name="매도",
-                        hovertemplate="매도일: %{x}<br>가격: %{y}<extra></extra>"
+                        decreasing=dict(
+                            line=dict(color='#00C4FF'),  # 하락: 파랑
+                            fillcolor='#00C4FF'
+                        )
                     ))
-                
-                # 레이아웃 설정 (모던 핀테크 스타일)
-                fig.update_layout(
-                    title=dict(
-                        text=f"{name} ({symbol}) 주가 차트",
-                        font=dict(size=20, color='#ffffff', family='Pretendard'),
-                        x=0.5,
-                        xanchor='center'
-                    ),
-                    xaxis=dict(
+                    
+                    # 날짜별 주석 추가
+                    annotations = []
+                    sell_dates = []
+                    sell_prices = []
+                    
+                    # 날짜 문자열을 datetime으로 변환하고 정규화하는 함수
+                    def parse_date_safe(date_str):
+                        if pd.isna(date_str) or date_str == "" or str(date_str).strip() == "":
+                            return None
+                        try:
+                            # 문자열을 datetime으로 변환하고 날짜만 남기기 (시간 정보 제거)
+                            date_dt = pd.to_datetime(date_str).normalize()
+                            return date_dt
+                        except Exception as e:
+                            return None
+                    
+                    # 날짜에 해당하는 마커를 찾는 함수 (주말/휴장일이면 다음 거래일 사용)
+                    def find_trading_date(target_date, data_index):
+                        """
+                        target_date에 해당하는 거래일을 찾습니다.
+                        주말/휴장일이면 다음 거래일(bfill)을 반환합니다.
+                        """
+                        if len(data_index) == 0:
+                            return None
+                        
+                        # 정규화된 날짜로 변환
+                        target_date = pd.to_datetime(target_date).normalize()
+                        
+                        # 정확히 일치하는 날짜가 있는지 확인
+                        if target_date in data_index:
+                            return target_date
+                        
+                        # 정확히 일치하지 않으면 다음 거래일 찾기 (bfill)
+                        # target_date 이후의 데이터만 필터링
+                        future_dates = data_index[data_index >= target_date]
+                        if len(future_dates) > 0:
+                            # 다음 거래일 반환
+                            return future_dates[0]
+                        
+                        # target_date 이전의 가장 가까운 날짜 찾기 (fallback)
+                        past_dates = data_index[data_index <= target_date]
+                        if len(past_dates) > 0:
+                            return past_dates[-1]
+                        
+                        return None
+                    
+                    # 관심일 표시 (네온 노란색 화살표 - 아래 방향)
+                    interest_dt = parse_date_safe(interest_date)
+                    if interest_dt is not None:
+                        try:
+                            if len(stock_data.index) > 0:
+                                # 거래일 찾기
+                                trading_date = find_trading_date(interest_dt, stock_data.index)
+                                if trading_date is not None and trading_date in stock_data.index:
+                                    price = stock_data.loc[trading_date, 'High']
+                                    # 가격 범위 계산 (텍스트 위치)
+                                    price_range = stock_data['High'].max() - stock_data['Low'].min()
+                                    offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
+                                    text_y = price + offset  # 텍스트 위치
+                                    annotations.append(dict(
+                                        x=trading_date,
+                                        y=text_y,  # 텍스트는 위에
+                                        xref="x",
+                                        yref="y",
+                                        text="👀 관심",
+                                        showarrow=True,
+                                        arrowhead=2,
+                                        arrowcolor="#FFD700",  # 네온 노란색
+                                        arrowsize=1.5,
+                                        arrowwidth=2,
+                                        ax=0,
+                                        ay=-70,  # 고정값: 위로 70픽셀
+                                        bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
+                                        bordercolor="#FFD700",
+                                        borderwidth=2,
+                                        font=dict(size=14, color="#FFD700")  # 텍스트 크기 증가
+                                    ))
+                        except Exception as e:
+                            pass
+                    
+                    # 매수일 표시 (네온 빨간색 화살표 - 위 방향) - 여러 개 표시
+                    for i in range(1, 11):
+                        buy_date_val = selected_row.get(f'BuyDate{i}', '')
+                        if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
+                            buy_dt = parse_date_safe(buy_date_val)
+                            if buy_dt is not None:
+                                try:
+                                    if len(stock_data.index) > 0:
+                                        trading_date = find_trading_date(buy_dt, stock_data.index)
+                                        if trading_date is not None and trading_date in stock_data.index:
+                                            price = stock_data.loc[trading_date, 'Low']
+                                            # 가격 범위 계산 (텍스트 위치)
+                                            price_range = stock_data['High'].max() - stock_data['Low'].min()
+                                            offset = price_range * 0.01  # 가격 범위의 1%만큼 아래로
+                                            text_y = price - offset  # 텍스트 위치
+                                            text_label = "🔴 매수" if i == 1 else f"🔴 매수{i}"
+                                            annotations.append(dict(
+                                                x=trading_date,
+                                                y=text_y,  # 텍스트는 아래에
+                                                xref="x",
+                                                yref="y",
+                                                text=text_label,
+                                                showarrow=True,
+                                                arrowhead=2,
+                                                arrowcolor="#FF2E2E",  # 네온 빨간색
+                                                arrowsize=1.5,
+                                                arrowwidth=2,
+                                                ax=0,
+                                                ay=70,  # 고정값: 아래로 70픽셀
+                                                bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
+                                                bordercolor="#FF2E2E",
+                                                borderwidth=2,
+                                                font=dict(size=14, color="#FF2E2E")  # 텍스트 크기 증가
+                                            ))
+                                except Exception as e:
+                                    pass
+                    
+                    # 매도일 표시 (네온 하늘색 화살표 - 아래 방향) - 여러 개 표시
+                    for i in range(1, 11):
+                        sell_date_val = selected_row.get(f'SellDate{i}', '')
+                        if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
+                            sell_dt = parse_date_safe(sell_date_val)
+                            if sell_dt is not None:
+                                try:
+                                    if len(stock_data.index) > 0:
+                                        trading_date = find_trading_date(sell_dt, stock_data.index)
+                                        if trading_date is not None and trading_date in stock_data.index:
+                                            price = stock_data.loc[trading_date, 'High']
+                                            # 가격 범위 계산 (텍스트 위치)
+                                            price_range = stock_data['High'].max() - stock_data['Low'].min()
+                                            offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
+                                            text_y = price + offset  # 텍스트 위치
+                                            sell_dates.append(trading_date)
+                                            sell_prices.append(price)
+                                            text_label = "🔵 매도" if i == 1 else f"🔵 매도{i}"
+                                            annotations.append(dict(
+                                                x=trading_date,
+                                                y=text_y,  # 텍스트는 위에
+                                                xref="x",
+                                                yref="y",
+                                                text=text_label,
+                                                showarrow=True,  # 화살표 추가
+                                                arrowhead=2,
+                                                arrowcolor="#00C4FF",  # 네온 하늘색
+                                                arrowsize=1.5,
+                                                arrowwidth=2,
+                                                ax=0,
+                                                ay=-70,  # 고정값: 위로 70픽셀
+                                                bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
+                                                bordercolor="#00C4FF",
+                                                borderwidth=2,
+                                                font=dict(size=14, color="#00C4FF"),  # 텍스트 크기 증가
+                                                yshift=10
+                                            ))
+                                except Exception as e:
+                                    pass
+                    
+                    # 매도일 점 마커 추가 (네온 하늘색)
+                    if sell_dates:
+                        fig.add_trace(go.Scatter(
+                            x=sell_dates,
+                            y=sell_prices,
+                            mode='markers',
+                            marker=dict(
+                                symbol='circle',
+                                size=18,  # 크기 증가
+                                color='#00C4FF',  # 네온 하늘색
+                                line=dict(width=2, color='#0088CC')
+                            ),
+                            name="매도",
+                            hovertemplate="매도일: %{x}<br>가격: %{y}<extra></extra>"
+                        ))
+                    
+                    # 레이아웃 설정 (모던 핀테크 스타일)
+                    fig.update_layout(
                         title=dict(
-                            text="날짜",
-                            font=dict(color='#e5e7eb', size=14, family='Pretendard')
+                            text=f"{name} ({symbol}) 주가 차트",
+                            font=dict(size=20, color='#ffffff', family='Pretendard'),
+                            x=0.5,
+                            xanchor='center'
                         ),
-                        tickfont=dict(color='#9ca3af', size=12),
-                        gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
-                        gridwidth=1,
-                        showgrid=True,
-                        zeroline=False,
-                        linecolor='rgba(255, 255, 255, 0.1)',
-                        linewidth=1
-                    ),
-                    yaxis=dict(
-                        title=dict(
-                            text="가격",
-                            font=dict(color='#e5e7eb', size=14, family='Pretendard')
+                        xaxis=dict(
+                            title=dict(
+                                text="날짜",
+                                font=dict(color='#e5e7eb', size=14, family='Pretendard')
+                            ),
+                            tickfont=dict(color='#9ca3af', size=12),
+                            gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
+                            gridwidth=1,
+                            showgrid=True,
+                            zeroline=False,
+                            linecolor='rgba(255, 255, 255, 0.1)',
+                            linewidth=1
                         ),
-                        tickfont=dict(color='#9ca3af', size=12),
-                        gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
-                        gridwidth=1,
-                        showgrid=True,
-                        zeroline=False,
-                        linecolor='rgba(255, 255, 255, 0.1)',
-                        linewidth=1
-                    ),
-                    xaxis_rangeslider_visible=False,
-                    height=600,
-                    annotations=annotations,
-                    hovermode='x unified',
-                    dragmode='zoom',
-                    plot_bgcolor='rgba(0, 0, 0, 0)',
-                    paper_bgcolor='rgba(0, 0, 0, 0)',
-                    font=dict(family='Pretendard', color='#e5e7eb'),
-                    legend=dict(
-                        bgcolor='rgba(0, 0, 0, 0)',
-                        bordercolor='rgba(255, 255, 255, 0.1)',
-                        borderwidth=1,
-                        font=dict(color='#e5e7eb', size=12)
+                        yaxis=dict(
+                            title=dict(
+                                text="가격",
+                                font=dict(color='#e5e7eb', size=14, family='Pretendard')
+                            ),
+                            tickfont=dict(color='#9ca3af', size=12),
+                            gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
+                            gridwidth=1,
+                            showgrid=True,
+                            zeroline=False,
+                            linecolor='rgba(255, 255, 255, 0.1)',
+                            linewidth=1
+                        ),
+                        xaxis_rangeslider_visible=False,
+                        height=600,
+                        annotations=annotations,
+                        hovermode='x unified',
+                        dragmode='zoom',
+                        plot_bgcolor='rgba(0, 0, 0, 0)',
+                        paper_bgcolor='rgba(0, 0, 0, 0)',
+                        font=dict(family='Pretendard', color='#e5e7eb'),
+                        legend=dict(
+                            bgcolor='rgba(0, 0, 0, 0)',
+                            bordercolor='rgba(255, 255, 255, 0.1)',
+                            borderwidth=1,
+                            font=dict(color='#e5e7eb', size=12)
+                        )
                     )
-                )
-                
-                # 차트 표시 (확대/축소 버튼 포함, 마우스 휠 줌 활성화)
-                st.plotly_chart(fig, use_container_width=True, config={
-                    'modeBarButtonsToAdd': ['zoomIn2d', 'zoomOut2d', 'resetScale2d', 'pan2d'],
-                    'displayModeBar': True,
-                    'displaylogo': False,
-                    'scrollZoom': True,  # 마우스 휠 줌 활성화
-                    'toImageButtonOptions': {
-                        'format': 'png',
-                        'filename': f'{name}_{symbol}_chart',
-                        'height': 600,
-                        'width': 1200,
-                        'scale': 1
-                    }
-                })
-                
-                # 메모 표시
-                if pd.notna(note) and note != "":
-                    st.info(f"**메모:** {note}")
+                    
+                    # 차트 표시 (확대/축소 버튼 포함, 마우스 휠 줌 활성화)
+                    st.plotly_chart(fig, use_container_width=True, config={
+                        'modeBarButtonsToAdd': ['zoomIn2d', 'zoomOut2d', 'resetScale2d', 'pan2d'],
+                        'displayModeBar': True,
+                        'displaylogo': False,
+                        'scrollZoom': True,  # 마우스 휠 줌 활성화
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': f'{name}_{symbol}_chart',
+                            'height': 600,
+                            'width': 1200,
+                            'scale': 1
+                        }
+                    })
+                    
+                    # 메모 표시
+                    if pd.notna(note) and note != "":
+                        st.info(f"**메모:** {note}")
+                    else:
+                        st.info("메모가 없습니다.")
                 else:
-                    st.info("메모가 없습니다.")
-            else:
-                st.error(f"{symbol} 종목의 데이터를 가져올 수 없습니다. 티커를 확인해주세요.")
+                    st.error(f"{symbol} 종목의 데이터를 가져올 수 없습니다. 티커를 확인해주세요.")
 
 # 탭 2: 분할 매수 플래너
 with tab2:
