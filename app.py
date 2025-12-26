@@ -292,7 +292,10 @@ st.markdown("""
     }
     
     /* 수정 버튼 스타일 (secondary 타입을 파란색 계열로) */
-    .stButton > button[kind="secondary"] {
+    .stButton > button[kind="secondary"],
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"],
+    div[role="dialog"] .stButton > button[kind="secondary"],
+    button[kind="secondary"] {
         background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
@@ -302,10 +305,28 @@ st.markdown("""
         transition: all 0.3s ease !important;
     }
     
-    .stButton > button[kind="secondary"]:hover {
+    .stButton > button[kind="secondary"] p,
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"] p,
+    div[role="dialog"] .stButton > button[kind="secondary"] p,
+    button[kind="secondary"] p {
+        color: #FFFFFF !important;
+    }
+    
+    .stButton > button[kind="secondary"]:hover,
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"]:hover,
+    div[role="dialog"] .stButton > button[kind="secondary"]:hover,
+    button[kind="secondary"]:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
         background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    .stButton > button[kind="secondary"]:hover p,
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"]:hover p,
+    div[role="dialog"] .stButton > button[kind="secondary"]:hover p,
+    button[kind="secondary"]:hover p {
+        color: #FFFFFF !important;
     }
     
     /* === 9. Dialog (팝업) 너비 조정 === */
@@ -449,10 +470,29 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* Dialog 내부 버튼 - 기존 스타일 유지 */
-    div[data-testid="stDialog"] .stButton > button,
-    div[role="dialog"] .stButton > button {
+    /* Dialog 내부 버튼 - primary 타입만 보라색, secondary는 파란색 */
+    div[data-testid="stDialog"] .stButton > button[kind="primary"],
+    div[role="dialog"] .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 secondary 버튼 (수정 버튼) - 파란색 */
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"],
+    div[role="dialog"] .stButton > button[kind="secondary"] {
+        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+    }
+    
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"] p,
+    div[role="dialog"] .stButton > button[kind="secondary"] p {
+        color: #FFFFFF !important;
+    }
+    
+    div[data-testid="stDialog"] .stButton > button[kind="secondary"]:hover,
+    div[role="dialog"] .stButton > button[kind="secondary"]:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
         color: #FFFFFF !important;
     }
     
