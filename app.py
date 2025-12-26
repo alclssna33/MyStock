@@ -1636,17 +1636,23 @@ with tab2:
             light_green = "#86efac"  # 연한 초록색
             dark_green = "#10b981"    # 진한 초록색
             
-            # HTML 버튼으로 뱃지 생성
+            # HTML 버튼으로 뱃지 생성 (모든 종목을 한 번에, 중복 없이)
             badges_html = '<div style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem;">'
+            
+            # 중복 방지를 위한 set
+            added_stock_ids = set()
             
             for idx, stock_data in enumerate(sorted_stocks):
                 name = stock_data['name']
                 progress = stock_data['progress']
                 stock_id = stock_data['id']
-                progress_pct = min(100, max(0, progress))
                 
-                # 디버깅: 진행률 확인용 (나중에 제거 가능)
-                # st.write(f"디버그: {name} - 진행률: {progress}%, progress_pct: {progress_pct}%")
+                # 중복 체크
+                if stock_id in added_stock_ids:
+                    continue
+                added_stock_ids.add(stock_id)
+                
+                progress_pct = min(100, max(0, progress))
                 
                 # 그라데이션을 더 명확하게 적용 (한 줄로 만들기)
                 # 진행률이 0%면 전체 연한 초록, 100%면 전체 진한 초록
@@ -1816,6 +1822,9 @@ with tab2:
                     btn.style.left = '-9999px';
                     btn.style.pointerEvents = 'none';
                     
+                    btn.style.fontSize = '0';
+                    btn.style.lineHeight = '0';
+                    
                     // 부모 컨테이너도 숨기기
                     const parent = btn.closest('div[data-testid="stButton"]');
                     if (parent) {{
@@ -1824,6 +1833,21 @@ with tab2:
                         parent.style.height = '0';
                         parent.style.margin = '0';
                         parent.style.padding = '0';
+                        parent.style.overflow = 'hidden';
+                    }}
+                    
+                    // 더 상위 컨테이너도 숨기기
+                    const container = btn.closest('div[data-testid="stContainer"]');
+                    if (container) {{
+                        const hasOnlyHiddenButtons = container.querySelectorAll('button:not([key^="badge_click_"]):not([key*="badge_click"])').length === 0;
+                        if (hasOnlyHiddenButtons) {{
+                            container.style.display = 'none';
+                            container.style.visibility = 'hidden';
+                            container.style.height = '0';
+                            container.style.margin = '0';
+                            container.style.padding = '0';
+                            container.style.overflow = 'hidden';
+                        }}
                     }}
                 }});
             }}
@@ -1854,18 +1878,6 @@ with tab2:
             """
             st.markdown(js_apply_styles, unsafe_allow_html=True)
             
-            # 디버깅 정보 표시 (옵션)
-            with st.expander("🔍 디버깅 정보 (클릭하여 확인)", expanded=False):
-                st.write("**뱃지 정보:**")
-                for stock_data in sorted_stocks[:5]:  # 처음 5개만 표시
-                    st.write(f"- {stock_data['name']}: 진행률 {stock_data['progress']:.2f}%")
-                st.code("""
-                브라우저 Console에서 확인:
-                1. F12 키 누르기
-                2. Console 탭 선택
-                3. "뱃지 버튼 찾음" 메시지 확인
-                4. "뱃지 스타일 적용" 메시지 확인
-                """)
             
             # JavaScript로 클릭 이벤트 처리
             st.markdown("""
@@ -1963,8 +1975,24 @@ with tab2:
             </style>
             """, unsafe_allow_html=True)
             
-            # Streamlit 버튼으로 클릭 이벤트 처리 (숨김)
+            # Streamlit 버튼으로 클릭 이벤트 처리 (완전히 숨김)
             # 각 종목당 버튼을 한 번만 생성 (중복 방지)
+            # 컨테이너를 숨기기 위해 CSS 적용
+            st.markdown("""
+            <style>
+            /* 숨겨진 버튼 컨테이너도 완전히 숨기기 */
+            div[data-testid="stContainer"]:has(button[key^="badge_click_"]),
+            div[data-testid="stContainer"]:has(button[key*="badge_click"]) {
+                display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             with st.container():
                 # 모든 종목에 대해 버튼 생성 (중복 없이)
                 created_stock_ids = set()
@@ -1977,22 +2005,6 @@ with tab2:
                             st.session_state[f"scroll_to_{stock_id}"] = True
                             st.rerun()
             
-            # 두 번째 줄 뱃지 (필요한 경우)
-            if len(sorted_stocks) > num_cols:
-                remaining_stocks = sorted_stocks[num_cols:]
-                
-                badges_html_2 = '<div style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem;">'
-                
-                for idx, stock_data in enumerate(remaining_stocks):
-                    name = stock_data['name']
-                    progress = stock_data['progress']
-                    stock_id = stock_data['id']
-                    progress_pct = min(100, max(0, progress))
-                    
-                    badges_html_2 += f'<button id="badge_btn_{stock_id}_2" class="stock-badge-btn" data-stock-id="{stock_id}" data-progress="{progress_pct}" style="background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%); border: 2px solid {dark_green}; border-radius: 12px; padding: 0.8rem 1.5rem; color: #ffffff; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: Pretendard, sans-serif; min-width: 120px;">{name}</button>'
-                
-                badges_html_2 += '</div>'
-                st.markdown(badges_html_2, unsafe_allow_html=True)
         
         # 전체 현황판 (드롭다운 기능 포함)
         if portfolio_data:
