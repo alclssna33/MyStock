@@ -1381,9 +1381,113 @@ with tab2:
             )
     
     # ==========================================
-    # 1. 포트폴리오 요약
+    # 1. 포트폴리오 요약 및 우측 상단 버튼
     # ==========================================
-    st.subheader("📊 포트폴리오 요약")
+    col_header1, col_header2 = st.columns([3, 1])
+    with col_header1:
+        st.subheader("📊 포트폴리오 요약")
+    with col_header2:
+        # 우측 상단 버튼 영역
+        st.markdown("<br>", unsafe_allow_html=True)  # 여백
+        with st.expander("➕ 새 종목 추가", expanded=False):
+            with st.form("add_split_stock_form"):
+                symbol = st.text_input("티커 (예: AAPL, 005930.KS)", placeholder="예: 005930.KS", key="split_symbol_input")
+                name = st.text_input("종목명", placeholder="예: 삼성전자", key="split_name_input")
+                interest_date = st.date_input("관심일", value=None, key="split_interest_date_input")
+                market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="split_market_cap_input")
+                installments = st.number_input("분할 횟수", min_value=1, value=3, key="split_installments_input")
+                category = st.selectbox("투자 전략", options=["Long", "Short"], key="split_category_input")
+                
+                if st.form_submit_button("계획 추가"):
+                    if name and market_cap > 0:
+                        # Symbol 중복 체크
+                        symbol_normalized = symbol.strip().upper() if symbol else ""
+                        all_stocks = load_stocks()
+                        
+                        if symbol_normalized:
+                            existing_symbols = all_stocks['Symbol'].astype(str).str.strip().str.upper()
+                            if symbol_normalized in existing_symbols.values:
+                                st.error("이미 등록된 티커입니다.")
+                            else:
+                                # 새 종목 추가
+                                new_row = {
+                                    "Symbol": symbol_normalized,
+                                    "Name": name,
+                                    "InterestDate": interest_date.strftime("%Y-%m-%d") if interest_date else "",
+                                    "Note": "",
+                                    "MarketCap": market_cap * 100000000,  # 억원을 원으로 변환
+                                    "Installments": int(installments),
+                                    "Category": category,
+                                    "BuyTransactions": json.dumps([]),
+                                    "SellTransactions": json.dumps([])
+                                }
+                                df_split = pd.concat([df_split, pd.DataFrame([new_row])], ignore_index=True)
+                                save_split_purchase_data(df_split)
+                                st.success(f"{name} 종목이 추가되었습니다!")
+                                st.rerun()
+                        else:
+                            st.error("티커를 입력해주세요.")
+                    else:
+                        st.error("종목명과 시가총액을 입력해주세요.")
+        
+        with st.expander("📋 관심종목에서 가져오기", expanded=False):
+            all_stocks = load_stocks()
+            
+            # 관심종목 필터링 (Installments가 비어있고 BuyTransactions가 비어있는 종목)
+            interest_stocks = []
+            for idx, row in all_stocks.iterrows():
+                installments = row.get('Installments', '')
+                buy_txs_str = row.get('BuyTransactions', '[]')
+                
+                # Installments가 비어있고 BuyTransactions가 비어있는 종목
+                has_installments = pd.notna(installments) and str(installments).strip() != "" and installments != 0
+                has_buy = False
+                try:
+                    if pd.notna(buy_txs_str) and str(buy_txs_str).strip() and buy_txs_str != '[]':
+                        buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                        has_buy = len(buy_txs) > 0 if isinstance(buy_txs, list) else False
+                except:
+                    pass
+                
+                if not has_installments and not has_buy:
+                    interest_stocks.append({
+                        'Symbol': row.get('Symbol', ''),
+                        'Name': row.get('Name', ''),
+                        'InterestDate': row.get('InterestDate', '')
+                    })
+            
+            if interest_stocks:
+                interest_options = [f"{s['Name']} ({s['Symbol']})" for s in interest_stocks]
+                selected_interest = st.selectbox("관심종목 선택", interest_options, key="select_interest_stock")
+                
+                with st.form("import_interest_stock_form"):
+                    # 선택된 종목 정보 표시
+                    selected_idx = interest_options.index(selected_interest) if selected_interest in interest_options else -1
+                    if selected_idx >= 0:
+                        selected_stock = interest_stocks[selected_idx]
+                        st.info(f"선택된 종목: {selected_stock['Name']} ({selected_stock['Symbol']})")
+                    
+                    market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="import_market_cap")
+                    installments = st.number_input("분할 횟수", min_value=1, value=3, key="import_installments")
+                    category = st.selectbox("투자 전략", options=["Long", "Short"], key="import_category")
+                    
+                    if st.form_submit_button("분할 매수 플래너에 추가"):
+                        if selected_idx >= 0 and market_cap > 0:
+                            selected_stock = interest_stocks[selected_idx]
+                            # 기존 종목 업데이트
+                            all_stocks = load_stocks()
+                            mask = all_stocks['Symbol'] == selected_stock['Symbol']
+                            if mask.any():
+                                all_stocks.loc[mask, 'MarketCap'] = market_cap * 100000000
+                                all_stocks.loc[mask, 'Installments'] = int(installments)
+                                all_stocks.loc[mask, 'Category'] = category
+                                save_stocks(all_stocks)
+                                st.success(f"{selected_stock['Name']}이(가) 분할 매수 플래너에 추가되었습니다!")
+                                st.rerun()
+                        else:
+                            st.error("시가총액을 입력해주세요.")
+            else:
+                st.info("관심종목이 없습니다.")
     
     if df_split.empty:
         st.info("추가된 종목이 없습니다.")
@@ -1438,13 +1542,34 @@ with tab2:
         
         overall_progress = (total_invested / total_budget * 100) if total_budget > 0 else 0
         
-        # 요약 메트릭
-        col1, col2, col3 = st.columns(3)
-        col1.metric("총 예산", f"{total_budget:,.0f}원")
-        col2.metric("총 매입금액", f"{total_invested:,.0f}원")
-        col3.metric("진행률", f"{overall_progress:.2f}%")
+        # 요약 메트릭 (하단에 표시)
+        col_summary1, col_summary2 = st.columns(2)
+        with col_summary1:
+            st.markdown(f"""
+            <div style="
+                background: rgba(99, 102, 241, 0.1);
+                border-radius: 10px;
+                padding: 1.5rem;
+                margin-bottom: 1rem;
+            ">
+                <div style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 0.5rem;">총 예산</div>
+                <div style="color: #ffffff; font-size: 1.8rem; font-weight: 700;">₩{total_budget:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_summary2:
+            st.markdown(f"""
+            <div style="
+                background: rgba(99, 102, 241, 0.1);
+                border-radius: 10px;
+                padding: 1.5rem;
+                margin-bottom: 1rem;
+            ">
+                <div style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 0.5rem;">진행률</div>
+                <div style="color: #60a5fa; font-size: 1.8rem; font-weight: 700;">{overall_progress:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # 도넛 차트
+        # 도넛 차트 (개선된 버전)
         if total_invested > 0:
             colors = px.colors.qualitative.Plotly
             chart_df = pd.DataFrame(portfolio_data)
@@ -1455,153 +1580,285 @@ with tab2:
                     chart_df,
                     values='totalInvested',
                     names='name',
-                    hole=0.4,
+                    hole=0.6,
                     color_discrete_sequence=colors
                 )
-                fig_donut.update_layout(
-                    title="전체 총 매입금액",
-                    showlegend=True,
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='white'),
-                    height=400
+                # 중앙에 총 매입금액 표시
+                fig_donut.update_traces(
+                    textposition='outside',
+                    textinfo='label+percent',
+                    hovertemplate='<b>%{label}</b><br>매입금액: ₩%{value:,.0f}<br>비중: %{percent}<extra></extra>'
                 )
-                fig_donut.update_traces(textinfo='percent+label', textposition='inside')
+                fig_donut.update_layout(
+                    title=dict(
+                        text="포트폴리오 요약",
+                        font=dict(size=24, color='#a78bfa', family='Pretendard'),
+                        x=0.5,
+                        xanchor='center'
+                    ),
+                    annotations=[
+                        dict(
+                            text=f'<b>전체 총 매입금액</b><br>₩{total_invested:,.0f}',
+                            x=0.5,
+                            y=0.5,
+                            font_size=20,
+                            font_color='#ffffff',
+                            showarrow=False,
+                            font_family='Pretendard'
+                        )
+                    ],
+                    showlegend=True,
+                    legend=dict(
+                        orientation="v",
+                        yanchor="middle",
+                        y=0.5,
+                        xanchor="left",
+                        x=1.05,
+                        font=dict(color='#ffffff', size=12, family='Pretendard')
+                    ),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#ffffff', family='Pretendard'),
+                    height=500,
+                    margin=dict(l=0, r=150, t=80, b=0)
+                )
                 st.plotly_chart(fig_donut, use_container_width=True)
         
-        # 포트폴리오 테이블
+        # 매수종목 뱃지 (그라데이션으로 진행률 표시)
         if portfolio_data:
+            st.markdown("### 종목별 현황")
+            # 뱃지 스타일 CSS
+            st.markdown("""
+            <style>
+            .stock-badge {
+                display: inline-block;
+                padding: 0.8rem 1.5rem;
+                margin: 0.3rem;
+                border-radius: 12px;
+                color: #ffffff;
+                font-weight: 600;
+                font-size: 0.95rem;
+                cursor: pointer;
+                transition: all 0.3s;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                border: 2px solid;
+            }
+            .stock-badge:hover {
+                transform: scale(1.05);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # 뱃지들을 그리드로 표시
+            sorted_stocks = sorted(portfolio_data, key=lambda x: x['totalInvested'], reverse=True)
+            num_cols = min(9, len(sorted_stocks))
+            badge_cols = st.columns(num_cols)
+            
+            for idx, stock_data in enumerate(sorted_stocks):
+                name = stock_data['name']
+                progress = stock_data['progress']
+                stock_id = stock_data['id']
+                
+                # 진행률에 따른 그라데이션 색상
+                if progress >= 100:
+                    gradient_start = "#10b981"  # 초록
+                elif progress >= 50:
+                    gradient_start = "#3b82f6"  # 파랑
+                else:
+                    gradient_start = "#6366f1"  # 보라
+                
+                # 진행률에 따른 그라데이션 적용
+                progress_pct = min(100, max(0, progress))
+                col_idx = idx % num_cols
+                
+                with badge_cols[col_idx]:
+                    # 뱃지 버튼 (클릭 시 해당 종목 expander 열기)
+                    if st.button(name, key=f"badge_{stock_id}", use_container_width=True):
+                        st.session_state[f"expand_{stock_id}"] = True
+                        st.rerun()
+                    
+                    # 뱃지 스타일 적용 (CSS 인라인)
+                    st.markdown(f"""
+                    <style>
+                    button[key="badge_{stock_id}"] {{
+                        background: linear-gradient(135deg, {gradient_start} {progress_pct}%, rgba(55, 65, 81, 0.5) {progress_pct}%) !important;
+                        border: 2px solid {gradient_start} !important;
+                        border-radius: 12px !important;
+                        color: #ffffff !important;
+                        font-weight: 600 !important;
+                    }}
+                    </style>
+                    """, unsafe_allow_html=True)
+            
+            # 두 번째 줄 뱃지 (필요한 경우)
+            if len(sorted_stocks) > num_cols:
+                remaining_stocks = sorted_stocks[num_cols:]
+                remaining_cols = st.columns(min(9, len(remaining_stocks)))
+                for idx, stock_data in enumerate(remaining_stocks):
+                    name = stock_data['name']
+                    progress = stock_data['progress']
+                    stock_id = stock_data['id']
+                    
+                    if progress >= 100:
+                        gradient_start = "#10b981"
+                    elif progress >= 50:
+                        gradient_start = "#3b82f6"
+                    else:
+                        gradient_start = "#6366f1"
+                    
+                    progress_pct = min(100, max(0, progress))
+                    col_idx = idx % len(remaining_cols)
+                    
+                    with remaining_cols[col_idx]:
+                        if st.button(name, key=f"badge_{stock_id}_2", use_container_width=True):
+                            st.session_state[f"expand_{stock_id}"] = True
+                            st.rerun()
+                        
+                        st.markdown(f"""
+                        <style>
+                        button[key="badge_{stock_id}_2"] {{
+                            background: linear-gradient(135deg, {gradient_start} {progress_pct}%, rgba(55, 65, 81, 0.5) {progress_pct}%) !important;
+                            border: 2px solid {gradient_start} !important;
+                            border-radius: 12px !important;
+                            color: #ffffff !important;
+                            font-weight: 600 !important;
+                        }}
+                        </style>
+                        """, unsafe_allow_html=True)
+        
+        # 전체 현황판 (드롭다운 기능 포함)
+        if portfolio_data:
+            st.markdown("### 전체 현황판")
             display_df = pd.DataFrame(portfolio_data)
             display_df = display_df.sort_values('totalInvested', ascending=False)
             display_df['percentage'] = (display_df['totalInvested'] / total_invested * 100) if total_invested > 0 else 0
             
-            st.dataframe(
-                display_df[['name', 'totalInvested', 'progress', 'percentage']].rename(columns={
-                    'name': '종목명',
-                    'totalInvested': '현재 매입금액',
-                    'progress': '매수 진행률 (%)',
-                    'percentage': '비중 (%)'
-                }).style.format({
-                    '현재 매입금액': '{:,.0f}',
-                    '매수 진행률 (%)': '{:.2f}',
-                    '비중 (%)': '{:.1f}'
-                }),
-                use_container_width=True
-            )
-    
-    st.divider()
-    
-    # ==========================================
-    # 2. 새 종목 추가
-    # ==========================================
-    with st.expander("➕ 새 종목 추가", expanded=False):
-        with st.form("add_split_stock_form"):
-            symbol = st.text_input("티커 (예: AAPL, 005930.KS)", placeholder="예: 005930.KS", key="split_symbol_input")
-            name = st.text_input("종목명", placeholder="예: 삼성전자", key="split_name_input")
-            interest_date = st.date_input("관심일", value=None, key="split_interest_date_input")
-            market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="split_market_cap_input")
-            installments = st.number_input("분할 횟수", min_value=1, value=3, key="split_installments_input")
-            category = st.selectbox("투자 전략", options=["Long", "Short"], key="split_category_input")
+            # 드롭다운으로 정렬 옵션 선택
+            sort_options = {
+                "매입금액 높은 순": "totalInvested",
+                "매입금액 낮은 순": "totalInvested_asc",
+                "진행률 높은 순": "progress",
+                "진행률 낮은 순": "progress_asc",
+                "비중 높은 순": "percentage",
+                "비중 낮은 순": "percentage_asc"
+            }
+            selected_sort = st.selectbox("정렬 기준", list(sort_options.keys()), key="portfolio_sort")
             
-            if st.form_submit_button("계획 추가"):
-                if name and market_cap > 0:
-                    # Symbol 중복 체크
-                    symbol_normalized = symbol.strip().upper() if symbol else ""
-                    all_stocks = load_stocks()
-                    
-                    if symbol_normalized:
-                        existing_symbols = all_stocks['Symbol'].astype(str).str.strip().str.upper()
-                        if symbol_normalized in existing_symbols.values:
-                            st.error("이미 등록된 티커입니다.")
-                        else:
-                            # 새 종목 추가
-                            new_row = {
-                                "Symbol": symbol_normalized,
-                                "Name": name,
-                                "InterestDate": interest_date.strftime("%Y-%m-%d") if interest_date else "",
-                                "Note": "",
-                                "MarketCap": market_cap * 100000000,  # 억원을 원으로 변환
-                                "Installments": int(installments),
-                                "Category": category,
-                                "BuyTransactions": json.dumps([]),
-                                "SellTransactions": json.dumps([])
-                            }
-                            df_split = pd.concat([df_split, pd.DataFrame([new_row])], ignore_index=True)
-                            save_split_purchase_data(df_split)
-                            st.success(f"{name} 종목이 추가되었습니다!")
-                            st.rerun()
-                    else:
-                        st.error("티커를 입력해주세요.")
+            sort_col = sort_options[selected_sort]
+            if sort_col.endswith("_asc"):
+                ascending = True
+                sort_col = sort_col.replace("_asc", "")
+            else:
+                ascending = False
+            
+            display_df = display_df.sort_values(sort_col, ascending=ascending)
+            
+            # 커스텀 테이블 스타일
+            st.markdown("""
+            <style>
+            .portfolio-table {
+                background: rgba(30, 41, 59, 0.5);
+                border-radius: 10px;
+                padding: 1rem;
+                margin-top: 1rem;
+            }
+            .portfolio-table-header {
+                display: grid;
+                grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
+                gap: 1rem;
+                padding: 1rem;
+                background: rgba(99, 102, 241, 0.2);
+                border-radius: 8px;
+                margin-bottom: 0.5rem;
+                font-weight: 600;
+                color: #ffffff;
+            }
+            .portfolio-table-row {
+                display: grid;
+                grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
+                gap: 1rem;
+                padding: 0.8rem 1rem;
+                background: rgba(30, 41, 59, 0.3);
+                border-radius: 6px;
+                margin-bottom: 0.3rem;
+                align-items: center;
+                transition: background 0.2s;
+            }
+            .portfolio-table-row:hover {
+                background: rgba(99, 102, 241, 0.2);
+            }
+            .progress-bar-container {
+                width: 100%;
+                height: 24px;
+                background: rgba(55, 65, 81, 0.5);
+                border-radius: 12px;
+                overflow: hidden;
+                position: relative;
+            }
+            .progress-bar-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                border-radius: 12px;
+                transition: width 0.3s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                font-weight: 600;
+                font-size: 0.85rem;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # 테이블 헤더
+            st.markdown("""
+            <div class="portfolio-table">
+                <div class="portfolio-table-header">
+                    <div style="text-align: center;">#</div>
+                    <div>종목명</div>
+                    <div>현재 매입금액 (% 비중)</div>
+                    <div>매수 진행률</div>
+                    <div style="text-align: center;">비중</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 테이블 행
+            for row_idx, (_, row) in enumerate(display_df.iterrows()):
+                name = row['name']
+                invested = row['totalInvested']
+                progress = row['progress']
+                percentage = row['percentage']
+                
+                # 진행률에 따른 색상
+                if progress >= 100:
+                    progress_color = "#10b981"
+                elif progress >= 50:
+                    progress_color = "#3b82f6"
                 else:
-                    st.error("종목명과 시가총액을 입력해주세요.")
+                    progress_color = "#6366f1"
+                
+                st.markdown(f"""
+                <div class="portfolio-table-row">
+                    <div style="text-align: center; color: #9ca3af;">{row_idx + 1}</div>
+                    <div style="color: #ffffff; font-weight: 500;">{name}</div>
+                    <div style="color: #ffffff;">₩{invested:,.0f} ({percentage:.1f}%)</div>
+                    <div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: {min(100, max(0, progress))}%; background: linear-gradient(90deg, {progress_color}, {progress_color}dd);">
+                                {progress:.2f}%
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; color: #9ca3af;">{percentage:.1f}%</div>
+                </div>
+                """, unsafe_allow_html=True)
     
     st.divider()
     
     # ==========================================
-    # 3. 관심종목에서 가져오기
-    # ==========================================
-    with st.expander("📋 관심종목에서 가져오기", expanded=False):
-        all_stocks = load_stocks()
-        
-        # 관심종목 필터링 (Installments가 비어있고 BuyTransactions가 비어있는 종목)
-        interest_stocks = []
-        for idx, row in all_stocks.iterrows():
-            installments = row.get('Installments', '')
-            buy_txs_str = row.get('BuyTransactions', '[]')
-            
-            # Installments가 비어있고 BuyTransactions가 비어있는 종목
-            has_installments = pd.notna(installments) and str(installments).strip() != "" and installments != 0
-            has_buy = False
-            try:
-                if pd.notna(buy_txs_str) and str(buy_txs_str).strip() and buy_txs_str != '[]':
-                    buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
-                    has_buy = len(buy_txs) > 0 if isinstance(buy_txs, list) else False
-            except:
-                pass
-            
-            if not has_installments and not has_buy:
-                interest_stocks.append({
-                    'Symbol': row.get('Symbol', ''),
-                    'Name': row.get('Name', ''),
-                    'InterestDate': row.get('InterestDate', '')
-                })
-        
-        if interest_stocks:
-            interest_options = [f"{s['Name']} ({s['Symbol']})" for s in interest_stocks]
-            selected_interest = st.selectbox("관심종목 선택", interest_options, key="select_interest_stock")
-            
-            with st.form("import_interest_stock_form"):
-                # 선택된 종목 정보 표시
-                selected_idx = interest_options.index(selected_interest) if selected_interest in interest_options else -1
-                if selected_idx >= 0:
-                    selected_stock = interest_stocks[selected_idx]
-                    st.info(f"선택된 종목: {selected_stock['Name']} ({selected_stock['Symbol']})")
-                
-                market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="import_market_cap")
-                installments = st.number_input("분할 횟수", min_value=1, value=3, key="import_installments")
-                category = st.selectbox("투자 전략", options=["Long", "Short"], key="import_category")
-                
-                if st.form_submit_button("분할 매수 플래너에 추가"):
-                    if selected_idx >= 0 and market_cap > 0:
-                        selected_stock = interest_stocks[selected_idx]
-                        # 기존 종목 업데이트
-                        all_stocks = load_stocks()
-                        mask = all_stocks['Symbol'] == selected_stock['Symbol']
-                        if mask.any():
-                            all_stocks.loc[mask, 'MarketCap'] = market_cap * 100000000
-                            all_stocks.loc[mask, 'Installments'] = int(installments)
-                            all_stocks.loc[mask, 'Category'] = category
-                            save_stocks(all_stocks)
-                            st.success(f"{selected_stock['Name']}이(가) 분할 매수 플래너에 추가되었습니다!")
-                            st.rerun()
-                    else:
-                        st.error("시가총액을 입력해주세요.")
-        else:
-            st.info("관심종목이 없습니다.")
-    
-    st.divider()
-    
-    # ==========================================
-    # 4. 종목별 카드 표시
+    # 2. 종목별 카드 표시
     # ==========================================
     if not df_split.empty:
         st.subheader("📦 종목별 상세 관리")
@@ -1660,8 +1917,13 @@ with tab2:
                     profit = (tx.get('price', 0) - avg_price) * tx.get('quantity', 0)
                     total_realized_profit += profit
             
-            # 종목 카드
-            with st.expander(f"📊 {stock_name}", expanded=False):
+            # 종목 카드 (뱃지 클릭 시 열리도록)
+            expander_key = f"expand_{stock_id}"
+            is_expanded = st.session_state.get(expander_key, False)
+            with st.expander(f"📊 {stock_name}", expanded=is_expanded):
+                # expander가 열렸으면 session_state 초기화
+                if is_expanded:
+                    st.session_state[expander_key] = False
                 # 요약 정보
                 col1, col2, col3, col4, col5 = st.columns(5)
                 col1.metric("최대 매수 가능액", f"{max_investment:,.0f}원")
