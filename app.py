@@ -1656,7 +1656,6 @@ with tab2:
                     class="stock-badge-btn"
                     data-stock-id="{stock_id}"
                     data-progress="{progress_pct}"
-                    onclick="handleBadgeClick('{stock_id}')"
                     style="
                         background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%);
                         border: 2px solid {dark_green};
@@ -1671,14 +1670,26 @@ with tab2:
                         font-family: 'Pretendard', sans-serif;
                         min-width: 120px;
                     "
-                    onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
-                    onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
                 >
                     {name}
                 </button>
                 """
             
             badges_html += '</div>'
+            
+            # CSS 스타일 추가 (호버 효과 포함)
+            st.markdown(f"""
+            <style>
+            .stock-badge-btn, [id^="badge_btn_"] {{
+                transition: all 0.3s ease !important;
+            }}
+            .stock-badge-btn:hover, [id^="badge_btn_"]:hover {{
+                transform: scale(1.05) !important;
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
+            }}
+            </style>
+            """, unsafe_allow_html=True)
+            
             st.markdown(badges_html, unsafe_allow_html=True)
             
             # JavaScript로 강제 스타일 적용 (더 강력한 버전)
@@ -1766,6 +1777,37 @@ with tab2:
             }} catch(e) {{
                 console.log('MutationObserver 오류:', e);
             }}
+            
+            // 호버 효과 및 클릭 이벤트 추가
+            function setupBadgeEvents() {{
+                const badges = document.querySelectorAll('.stock-badge-btn, [id^="badge_btn_"]');
+                
+                badges.forEach(btn => {{
+                    const stockId = btn.getAttribute('data-stock-id') || btn.id.replace('badge_btn_', '').replace('_2', '');
+                    
+                    // 호버 효과
+                    btn.addEventListener('mouseenter', function() {{
+                        this.style.transform = 'scale(1.05)';
+                        this.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.2)';
+                    }});
+                    
+                    btn.addEventListener('mouseleave', function() {{
+                        this.style.transform = 'scale(1)';
+                        this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                    }});
+                    
+                    // 클릭 이벤트
+                    btn.addEventListener('click', function(e) {{
+                        e.preventDefault();
+                        handleBadgeClick(stockId);
+                    }});
+                }});
+            }}
+            
+            // 이벤트 설정
+            setTimeout(setupBadgeEvents, 100);
+            setTimeout(setupBadgeEvents, 500);
+            setTimeout(setupBadgeEvents, 1000);
             
             console.log('뱃지 스타일 스크립트 로드 완료');
             </script>
@@ -1890,7 +1932,6 @@ with tab2:
                         class="stock-badge-btn"
                         data-stock-id="{stock_id}"
                         data-progress="{progress_pct}"
-                        onclick="handleBadgeClick('{stock_id}')"
                         style="
                             background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%);
                             border: 2px solid {dark_green};
@@ -1905,8 +1946,6 @@ with tab2:
                             font-family: 'Pretendard', sans-serif;
                             min-width: 120px;
                         "
-                        onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
-                        onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
                     >
                         {name}
                     </button>
