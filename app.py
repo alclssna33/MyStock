@@ -1353,23 +1353,30 @@ with tab2:
     # 데이터 로드
     df_split = load_split_purchase_data()
     
-    # 종목 상세 정보를 보여주는 Dialog 함수 (뱃지 클릭 전에 정의되어야 함)
-    def show_stock_detail_dialog(stock_row, stock_idx):
+    # Dialog 상태 관리
+    if 'dialog_stock_id' not in st.session_state:
+        st.session_state['dialog_stock_id'] = None
+    
+    # 종목 상세 정보를 보여주는 Dialog 렌더링 함수
+    def render_stock_detail_dialog():
         """종목 상세 정보를 Modal Popup으로 표시"""
+        if st.session_state.get('dialog_stock_id') is None:
+            return
+        
         # 최신 데이터 로드
         df_split = load_split_purchase_data()
         
-        # stock_idx로 다시 찾기 (인덱스가 변경되었을 수 있음)
-        if stock_idx not in df_split.index:
-            # Symbol로 찾기
-            stock_id_to_find = stock_row.get('Symbol')
-            matching_rows = df_split[df_split['Symbol'] == stock_id_to_find]
-            if not matching_rows.empty:
-                stock_idx = matching_rows.index[0]
-                stock_row = df_split.loc[stock_idx]
-            else:
-                st.error("종목을 찾을 수 없습니다.")
-                return
+        # dialog_stock_id로 종목 찾기
+        stock_id_to_find = st.session_state['dialog_stock_id']
+        matching_rows = df_split[df_split['Symbol'] == stock_id_to_find]
+        
+        if matching_rows.empty:
+            st.error("종목을 찾을 수 없습니다.")
+            st.session_state['dialog_stock_id'] = None
+            return
+        
+        stock_idx = matching_rows.index[0]
+        stock_row = df_split.loc[stock_idx]
         
         stock_id = stock_row.get('Symbol', f'stock_{stock_idx}')
         stock_name = stock_row.get('Name', '')
@@ -1425,6 +1432,11 @@ with tab2:
         
         # Dialog로 표시
         with st.dialog(f"📊 {stock_name}"):
+            # 닫기 버튼
+            if st.button("✕ 닫기", key=f"close_dialog_{stock_id}", type="secondary"):
+                st.session_state['dialog_stock_id'] = None
+                st.rerun()
+            
             # 요약 정보
             col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("최대 매수 가능액", f"{max_investment:,.0f}원")
@@ -1711,6 +1723,7 @@ with tab2:
             if st.button(f"🗑️ {stock_name} 삭제", key=f"delete_stock_{stock_id}", type="secondary"):
                 df_split = df_split.drop(stock_idx).reset_index(drop=True)
                 save_split_purchase_data(df_split)
+                st.session_state['dialog_stock_id'] = None
                 st.success(f"{stock_name} 종목이 삭제되었습니다!")
                 st.rerun()
     
@@ -2080,12 +2093,9 @@ with tab2:
                     
                     with badge_cols[idx]:
                         if create_overlay_badge(name, progress_pct, f"badge_{stock_id}"):
-                            # 뱃지 클릭 시 해당 종목의 dialog 호출
-                            df_split_current = load_split_purchase_data()
-                            for idx_inner, stock_inner in df_split_current.iterrows():
-                                if stock_inner.get('Symbol') == stock_id:
-                                    show_stock_detail_dialog(stock_inner, idx_inner)
-                                    break
+                            # 뱃지 클릭 시 dialog 열기
+                            st.session_state['dialog_stock_id'] = stock_id
+                            st.rerun()
                 
                 # 나머지 줄들
                 remaining = unique_stocks[num_cols:]
@@ -2103,12 +2113,9 @@ with tab2:
                             
                             with row_cols[col_idx]:
                                 if create_overlay_badge(name, progress_pct, f"badge_{stock_id}_r{row_num}"):
-                                    # 뱃지 클릭 시 해당 종목의 dialog 호출
-                                    df_split_current = load_split_purchase_data()
-                                    for idx_inner, stock_inner in df_split_current.iterrows():
-                                        if stock_inner.get('Symbol') == stock_id:
-                                            show_stock_detail_dialog(stock_inner, idx_inner)
-                                            break
+                                    # 뱃지 클릭 시 dialog 열기
+                                    st.session_state['dialog_stock_id'] = stock_id
+                                    st.rerun()
                         row_num += 1
             
         
@@ -2280,12 +2287,9 @@ with tab2:
                             st.markdown(f"<div style='text-align: center; color: #9ca3af;'>{row_idx + 1}</div>", unsafe_allow_html=True)
                         with row_cols[1]:
                             if st.button(name, key=f"stock_link_{stock_id}_{row_idx}", use_container_width=True):
-                                # 종목명 클릭 시 해당 종목의 dialog 호출
-                                df_split_current = load_split_purchase_data()
-                                for idx_inner, stock_inner in df_split_current.iterrows():
-                                    if stock_inner.get('Symbol') == stock_id:
-                                        show_stock_detail_dialog(stock_inner, idx_inner)
-                                        break
+                                # 종목명 클릭 시 dialog 열기
+                                st.session_state['dialog_stock_id'] = stock_id
+                                st.rerun()
                             st.markdown(f"""
                             <style>
                             button[key="stock_link_{stock_id}_{row_idx}"] {{
@@ -2317,6 +2321,8 @@ with tab2:
     st.divider()
     
     # ==========================================
-    # 2. 종목별 카드 표시
+    # 2. Dialog 렌더링 (클릭 시 표시)
     # ==========================================
-    # 기존 Expander 루프는 제거됨 - 클릭 시에만 dialog 호출
+    # Dialog가 열려있으면 렌더링
+    if st.session_state.get('dialog_stock_id') is not None:
+        render_stock_detail_dialog()
