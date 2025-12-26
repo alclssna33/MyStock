@@ -1688,15 +1688,15 @@ with tab2:
                                     st.rerun()
                         row_num += 1
             
-            # 뱃지 버튼 스타일링 (CSS + JavaScript로 진행률 적용)
+            # 뱃지 버튼 스타일링 (JavaScript로 직접 스타일 적용)
             if unique_stocks:
                 # 진행률 데이터 준비 (종목명을 키로 사용)
                 progress_map = {stock['name']: min(100, max(0, stock['progress'])) for stock in unique_stocks}
                 
                 st.markdown(f"""
                 <style>
-                /* 뱃지 버튼 기본 스타일 */
-                div[data-testid="stButton"] button[key^="badge_"] {{
+                /* 뱃지 버튼 기본 스타일 - JavaScript로 적용될 버튼을 위한 클래스 */
+                .stock-badge-button {{
                     border: 2px solid #10b981 !important;
                     border-radius: 12px !important;
                     color: #ffffff !important;
@@ -1709,7 +1709,7 @@ with tab2:
                     min-height: 48px !important;
                 }}
                 
-                div[data-testid="stButton"] button[key^="badge_"]:hover {{
+                .stock-badge-button:hover {{
                     transform: scale(1.05) !important;
                     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
                 }}
@@ -1724,59 +1724,75 @@ with tab2:
                     console.log('ProgressMap:', progressMap);
                     
                     function applyGradients() {{
-                        // 모든 badge 버튼 찾기 (key 속성으로 필터링)
+                        // 모든 Streamlit 버튼 찾기
                         const allButtons = document.querySelectorAll('div[data-testid="stButton"] button');
-                        const badgeButtons = Array.from(allButtons).filter(btn => {{
-                            const key = btn.getAttribute('key') || '';
-                            return key.startsWith('badge_');
-                        }});
                         
-                        console.log('Badge buttons found:', badgeButtons.length);
+                        console.log('Total buttons found:', allButtons.length);
                         
-                        badgeButtons.forEach((btn, index) => {{
+                        allButtons.forEach((btn, index) => {{
                             // 버튼의 텍스트(종목명) 가져오기 - 여러 방법 시도
                             let buttonText = btn.textContent.trim();
                             
+                            // innerText도 시도 (더 정확할 수 있음)
+                            if (!buttonText || buttonText.length === 0) {{
+                                buttonText = btn.innerText.trim();
+                            }}
+                            
                             // p 태그 내부 텍스트도 확인
                             const pTag = btn.querySelector('p');
-                            if (pTag) {{
+                            if (pTag && pTag.textContent.trim()) {{
                                 buttonText = pTag.textContent.trim();
                             }}
                             
                             // span 태그 내부 텍스트도 확인
                             const spanTag = btn.querySelector('span');
-                            if (spanTag && !buttonText) {{
+                            if (spanTag && spanTag.textContent.trim() && !buttonText) {{
                                 buttonText = spanTag.textContent.trim();
                             }}
                             
-                            console.log(`Button ${{index}}: text="${{buttonText}}"`);
+                            // 빈 텍스트는 스킵
+                            if (!buttonText || buttonText.length === 0) {{
+                                return;
+                            }}
                             
                             // progressMap에서 해당 종목명 찾기 (정확히 일치하는 것부터)
                             let progress = null;
+                            let matchedName = null;
+                            
                             if (progressMap[buttonText] !== undefined) {{
                                 progress = progressMap[buttonText];
+                                matchedName = buttonText;
                             }} else {{
                                 // 부분 일치 시도
                                 for (const [name, prog] of Object.entries(progressMap)) {{
-                                    if (buttonText.includes(name) || name.includes(buttonText)) {{
+                                    if (buttonText === name || buttonText.includes(name) || name.includes(buttonText)) {{
                                         progress = prog;
+                                        matchedName = name;
                                         break;
                                     }}
                                 }}
                             }}
                             
-                            if (progress !== null) {{
+                            if (progress !== null && matchedName) {{
                                 const gradient = `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progress}}%, ${{lightGreen}} ${{progress}}%, ${{lightGreen}} 100%)`;
                                 
-                                // 그라데이션 적용
+                                // 클래스 추가
+                                btn.classList.add('stock-badge-button');
+                                
+                                // 그라데이션 및 기본 스타일 적용
                                 btn.style.background = gradient;
                                 btn.style.backgroundImage = gradient;
                                 btn.style.setProperty('background', gradient, 'important');
                                 btn.style.setProperty('background-image', gradient, 'important');
+                                btn.style.setProperty('color', '#ffffff', 'important');
+                                btn.style.setProperty('border', '2px solid #10b981', 'important');
+                                btn.style.setProperty('border-radius', '12px', 'important');
+                                btn.style.setProperty('font-weight', '600', 'important');
+                                btn.style.setProperty('font-size', '0.95rem', 'important');
+                                btn.style.setProperty('padding', '0.8rem 1.5rem', 'important');
+                                btn.style.setProperty('min-height', '48px', 'important');
                                 
-                                console.log(`Applied gradient to "${{buttonText}}": ${{progress}}%`);
-                            }} else {{
-                                console.log(`No progress found for "${{buttonText}}"`);
+                                console.log(`Applied gradient to "${{buttonText}}" (matched: "${{matchedName}}"): ${{progress}}%`);
                             }}
                         }});
                     }}
