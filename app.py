@@ -1280,26 +1280,7 @@ with tab2:
     st.divider()
     
     # ==========================================
-    # 2. 데이터 관리
-    # ==========================================
-    st.subheader("📁 데이터 관리")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗑️ 데이터 초기화", type="secondary", key="reset_split_data"):
-            if st.session_state.get('confirm_reset_split', False):
-                df_split = pd.DataFrame(columns=["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
-                save_split_purchase_data(df_split)
-                st.success("데이터가 초기화되었습니다!")
-                st.session_state['confirm_reset_split'] = False
-                st.rerun()
-            else:
-                st.session_state['confirm_reset_split'] = True
-                st.warning("⚠️ 다시 클릭하면 모든 데이터가 삭제됩니다!")
-    
-    st.divider()
-    
-    # ==========================================
-    # 3. 새 종목 추가
+    # 2. 새 종목 추가
     # ==========================================
     with st.expander("➕ 새 종목 추가", expanded=False):
         with st.form("add_split_stock_form"):
