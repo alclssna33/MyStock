@@ -174,10 +174,20 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* number_input 내부 스타일 강제 적용 */
+    /* number_input 내부 스타일 강제 적용 - +, - 버튼 숨기기 */
     div[data-baseweb="input"] input[type="number"]::-webkit-inner-spin-button,
-    div[data-baseweb="input"] input[type="number"]::-webkit-outer-spin-button {
-        opacity: 1;
+    div[data-baseweb="input"] input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        margin: 0 !important;
+        display: none !important;
+    }
+    
+    /* Firefox에서도 스피너 숨기기 */
+    input[type="number"] {
+        -moz-appearance: textfield !important;
     }
     
     /* 매수 계획 카드 스타일 */
