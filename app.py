@@ -256,7 +256,7 @@ def init_google_sheet():
         
         # 헤더 확인 및 추가 (통합 구조)
         headers = worksheet.row_values(1)
-        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
+        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
         
         if not headers or headers != expected_columns:
             # 헤더 업데이트
@@ -283,7 +283,7 @@ def load_stocks():
         
         if not records:
             # 빈 DataFrame 반환 (헤더만 있는 경우)
-            columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
+            columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
             return pd.DataFrame(columns=columns)
         
         # DataFrame으로 변환
@@ -299,7 +299,7 @@ def load_stocks():
     except Exception as e:
         st.error(f"❌ 데이터 로드 실패: {str(e)}")
         # 빈 DataFrame 반환
-        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
+        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
         return pd.DataFrame(columns=columns)
 
 # Google Sheets에 데이터 저장 (통합 시트)
@@ -409,7 +409,7 @@ def load_split_purchase_data():
             records = ws.get_all_records()
             
             if not records:
-                return pd.DataFrame(columns=["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+                return pd.DataFrame(columns=["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"])
             
             df = pd.DataFrame(records)
             
@@ -419,12 +419,12 @@ def load_split_purchase_data():
         except gspread.WorksheetNotFound:
             # 워크시트가 없으면 생성 (init_google_sheet에서 처리되지만 안전장치)
             ws = spreadsheet.add_worksheet(title="Stocks", rows=1000, cols=20)
-            headers = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
+            headers = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
             ws.append_row(headers)
             return pd.DataFrame(columns=headers)
     except Exception as e:
         st.error(f"❌ 분할 매수 데이터 로드 실패: {str(e)}")
-        return pd.DataFrame(columns=["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+        return pd.DataFrame(columns=["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"])
 
 # 분할 매수 플래너 데이터 저장 (통합 시트 사용)
 def save_split_purchase_data(df):
@@ -505,8 +505,9 @@ def add_stock_callback():
                 "Name": name,
                 "InterestDate": interest_date.strftime("%Y-%m-%d") if interest_date else "",
                 "Note": note if note else "",
-                "MarketCap": "",
-                "Installments": "",
+                "MarketCap": "",  # 관심종목이므로 비워둠
+                "Installments": "",  # 관심종목이므로 비워둠
+                "Category": "",  # 관심종목이므로 비워둠
                 "BuyTransactions": "[]",
                 "SellTransactions": "[]"
             }
@@ -1261,8 +1262,16 @@ with tab2:
     # 데이터 로드
     df_split = load_split_purchase_data()
     
-    # JSON 파싱
+    # Installments가 있는 종목만 필터링 (분할 매수 플래너용)
     if not df_split.empty:
+        # Installments가 비어있지 않은 종목만
+        df_split = df_split[
+            df_split['Installments'].notna() & 
+            (df_split['Installments'] != '') & 
+            (df_split['Installments'] != 0)
+        ].copy()
+        
+        # JSON 파싱 (필터링 후)
         if 'BuyTransactions' in df_split.columns:
             df_split['BuyTransactions'] = df_split['BuyTransactions'].apply(
                 lambda x: json.loads(x) if isinstance(x, str) and x and x != '[]' else []
@@ -1382,6 +1391,7 @@ with tab2:
             interest_date = st.date_input("관심일", value=None, key="split_interest_date_input")
             market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="split_market_cap_input")
             installments = st.number_input("분할 횟수", min_value=1, value=3, key="split_installments_input")
+            category = st.selectbox("투자 전략", options=["Long", "Short"], key="split_category_input")
             
             if st.form_submit_button("계획 추가"):
                 if name and market_cap > 0:
@@ -1402,6 +1412,7 @@ with tab2:
                                 "Note": "",
                                 "MarketCap": market_cap * 100000000,  # 억원을 원으로 변환
                                 "Installments": int(installments),
+                                "Category": category,
                                 "BuyTransactions": json.dumps([]),
                                 "SellTransactions": json.dumps([])
                             }
@@ -1413,6 +1424,70 @@ with tab2:
                         st.error("티커를 입력해주세요.")
                 else:
                     st.error("종목명과 시가총액을 입력해주세요.")
+    
+    st.divider()
+    
+    # ==========================================
+    # 3. 관심종목에서 가져오기
+    # ==========================================
+    with st.expander("📋 관심종목에서 가져오기", expanded=False):
+        all_stocks = load_stocks()
+        
+        # 관심종목 필터링 (Installments가 비어있고 BuyTransactions가 비어있는 종목)
+        interest_stocks = []
+        for idx, row in all_stocks.iterrows():
+            installments = row.get('Installments', '')
+            buy_txs_str = row.get('BuyTransactions', '[]')
+            
+            # Installments가 비어있고 BuyTransactions가 비어있는 종목
+            has_installments = pd.notna(installments) and str(installments).strip() != "" and installments != 0
+            has_buy = False
+            try:
+                if pd.notna(buy_txs_str) and str(buy_txs_str).strip() and buy_txs_str != '[]':
+                    buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                    has_buy = len(buy_txs) > 0 if isinstance(buy_txs, list) else False
+            except:
+                pass
+            
+            if not has_installments and not has_buy:
+                interest_stocks.append({
+                    'Symbol': row.get('Symbol', ''),
+                    'Name': row.get('Name', ''),
+                    'InterestDate': row.get('InterestDate', '')
+                })
+        
+        if interest_stocks:
+            interest_options = [f"{s['Name']} ({s['Symbol']})" for s in interest_stocks]
+            selected_interest = st.selectbox("관심종목 선택", interest_options, key="select_interest_stock")
+            
+            with st.form("import_interest_stock_form"):
+                # 선택된 종목 정보 표시
+                selected_idx = interest_options.index(selected_interest) if selected_interest in interest_options else -1
+                if selected_idx >= 0:
+                    selected_stock = interest_stocks[selected_idx]
+                    st.info(f"선택된 종목: {selected_stock['Name']} ({selected_stock['Symbol']})")
+                
+                market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="import_market_cap")
+                installments = st.number_input("분할 횟수", min_value=1, value=3, key="import_installments")
+                category = st.selectbox("투자 전략", options=["Long", "Short"], key="import_category")
+                
+                if st.form_submit_button("분할 매수 플래너에 추가"):
+                    if selected_idx >= 0 and market_cap > 0:
+                        selected_stock = interest_stocks[selected_idx]
+                        # 기존 종목 업데이트
+                        all_stocks = load_stocks()
+                        mask = all_stocks['Symbol'] == selected_stock['Symbol']
+                        if mask.any():
+                            all_stocks.loc[mask, 'MarketCap'] = market_cap * 100000000
+                            all_stocks.loc[mask, 'Installments'] = int(installments)
+                            all_stocks.loc[mask, 'Category'] = category
+                            save_stocks(all_stocks)
+                            st.success(f"{selected_stock['Name']}이(가) 분할 매수 플래너에 추가되었습니다!")
+                            st.rerun()
+                    else:
+                        st.error("시가총액을 입력해주세요.")
+        else:
+            st.info("관심종목이 없습니다.")
     
     st.divider()
     
