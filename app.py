@@ -1416,7 +1416,6 @@ with tab2:
                         <div style="flex: 1.2; text-align: center;">날짜</div>
                         <div style="flex: 1.3; text-align: center;">목표액</div>
                         <div style="flex: 1.2; text-align: center;">매수가</div>
-                        <div style="flex: 0.8; text-align: center;">예상</div>
                         <div style="flex: 1.2; text-align: center;">매수량</div>
                         <div style="flex: 0.8; text-align: center;">실행</div>
                     </div>
@@ -1441,9 +1440,6 @@ with tab2:
                             existing_price = float(tx.get('price', 0)) if tx.get('price') else 0.0
                             existing_qty = int(tx.get('quantity', 0)) if tx.get('quantity') else 0
                         
-                        # 예상 수량 계산
-                        estimated_qty = int(amount_per_installment / existing_price) if existing_price > 0 else 0
-                        
                         # 카드 형태로 각 행 표시
                         with st.container():
                             st.markdown(f"""
@@ -1456,8 +1452,8 @@ with tab2:
                             ">
                             """, unsafe_allow_html=True)
                             
-                            # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 예상 | 매수량 | 실행
-                            col_round, col_date, col_target, col_price, col_est, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 0.8, 1.2, 0.8])
+                            # 행 레이아웃: 회차 | 날짜 | 목표액 | 매수가 | 매수량 | 실행
+                            col_round, col_date, col_target, col_price, col_qty, col_action = st.columns([0.5, 1.2, 1.3, 1.2, 1.2, 0.8])
                             
                             with col_round:
                                 st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-size: 1.1rem; font-weight: 600;'>{i+1}</div>", unsafe_allow_html=True)
@@ -1483,15 +1479,6 @@ with tab2:
                                     label_visibility="collapsed",
                                     placeholder="가격"
                                 )
-                            
-                            with col_est:
-                                # 예상 수량 계산 (세션 상태 사용하지 않음 - 리로드 방지)
-                                # 현재 입력된 매수가를 기반으로만 계산하여 표시
-                                if buy_price > 0:
-                                    current_estimated = int(amount_per_installment / buy_price)
-                                    st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-weight: 600; color: #10b981;'>{current_estimated:,}</div>", unsafe_allow_html=True)
-                                else:
-                                    st.markdown("<div style='text-align: center; padding-top: 0.8rem; color: #6b7280;'>-</div>", unsafe_allow_html=True)
                             
                             with col_qty:
                                 buy_qty = st.number_input(
