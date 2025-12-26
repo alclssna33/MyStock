@@ -141,18 +141,43 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* 숫자 입력 필드 스타일 */
-    input[type="number"] {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        color: #FFFFFF !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    /* 숫자 입력 필드 스타일 - 명확한 배경과 글자색 */
+    div[data-baseweb="input"] input[type="number"],
+    input[type="number"],
+    input[type="text"][inputmode="numeric"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
         border-radius: 6px !important;
         padding: 0.5rem !important;
     }
     
-    input[type="number"]:focus {
+    input[type="number"]:focus,
+    input[type="text"][inputmode="numeric"]:focus {
         border-color: #6366f1 !important;
         box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    
+    /* Streamlit number_input 컨테이너 */
+    div[data-baseweb="input"] {
+        background-color: transparent !important;
+    }
+    
+    div[data-baseweb="input"] > div {
+        background-color: #FFFFFF !important;
+    }
+    
+    div[data-baseweb="input"] input {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    
+    /* number_input 내부 스타일 강제 적용 */
+    div[data-baseweb="input"] input[type="number"]::-webkit-inner-spin-button,
+    div[data-baseweb="input"] input[type="number"]::-webkit-outer-spin-button {
+        opacity: 1;
     }
     
     /* 매수 계획 카드 스타일 */
@@ -1460,19 +1485,12 @@ with tab2:
                                 )
                             
                             with col_est:
-                                # 매수가 변경 시 예상 수량 자동 계산
-                                # 세션 상태를 사용하여 실시간 업데이트
-                                if f"estimated_qty_{stock_id}_{i}" not in st.session_state:
-                                    st.session_state[f"estimated_qty_{stock_id}_{i}"] = estimated_qty
-                                
-                                # 매수가가 변경되었는지 확인
+                                # 예상 수량 계산 (세션 상태 사용하지 않음 - 리로드 방지)
+                                # 현재 입력된 매수가를 기반으로만 계산하여 표시
                                 if buy_price > 0:
-                                    new_estimated = int(amount_per_installment / buy_price)
-                                    if st.session_state[f"estimated_qty_{stock_id}_{i}"] != new_estimated:
-                                        st.session_state[f"estimated_qty_{stock_id}_{i}"] = new_estimated
-                                    st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-weight: 600; color: #10b981;'>{st.session_state[f'estimated_qty_{stock_id}_{i}']:,}</div>", unsafe_allow_html=True)
+                                    current_estimated = int(amount_per_installment / buy_price)
+                                    st.markdown(f"<div style='text-align: center; padding-top: 0.8rem; font-weight: 600; color: #10b981;'>{current_estimated:,}</div>", unsafe_allow_html=True)
                                 else:
-                                    st.session_state[f"estimated_qty_{stock_id}_{i}"] = 0
                                     st.markdown("<div style='text-align: center; padding-top: 0.8rem; color: #6b7280;'>-</div>", unsafe_allow_html=True)
                             
                             with col_qty:
