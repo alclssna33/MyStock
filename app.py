@@ -4,7 +4,10 @@ import yfinance as yf
 import plotly.graph_objects as go
 import os
 import time
+import json
 from datetime import datetime, timedelta
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # 페이지 설정
 st.set_page_config(
@@ -132,57 +135,135 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# CSV 파일 경로
-CSV_FILE = "stocks.csv"
+# Google Sheets 설정
+SPREADSHEET_NAME = "stock_db"
+SCOPE = ['https://spreadsheets.google.com/feeds',
+         'https://www.googleapis.com/auth/drive']
 
-# CSV 파일이 없으면 생성
-def init_csv():
-    if not os.path.exists(CSV_FILE):
-        # BuyDate1~10, SellDate1~10 컬럼 추가
+# Google Sheets 클라이언트 가져오기 (캐싱)
+@st.cache_resource
+def get_google_sheets_client():
+    """Google Sheets API 클라이언트를 반환합니다."""
+    try:
+        # Streamlit secrets에서 가져오기 시도
+        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            creds_dict = dict(st.secrets['gcp_service_account'])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+        # secrets.json 파일에서 가져오기
+        elif os.path.exists("secrets.json"):
+            creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", SCOPE)
+        else:
+            st.error("❌ Google Sheets 인증 정보를 찾을 수 없습니다.\n\n"
+                    "다음 중 하나를 설정해주세요:\n"
+                    "1. Streamlit secrets에 'gcp_service_account' 키 추가\n"
+                    "2. 프로젝트 루트에 'secrets.json' 파일 추가")
+            st.stop()
+        
+        client = gspread.authorize(creds)
+        return client
+    except Exception as e:
+        st.error(f"❌ Google Sheets 연결 실패: {str(e)}\n\n"
+                "secrets.json 파일이 올바른 형식인지 확인해주세요.")
+        st.stop()
+
+# Google Sheets 초기화
+def init_google_sheet():
+    """Google Sheets 스프레드시트와 워크시트를 초기화합니다."""
+    try:
+        client = get_google_sheets_client()
+        
+        # 스프레드시트 찾기 또는 생성
+        try:
+            spreadsheet = client.open(SPREADSHEET_NAME)
+        except gspread.SpreadsheetNotFound:
+            # 스프레드시트가 없으면 생성
+            spreadsheet = client.create(SPREADSHEET_NAME)
+            st.info(f"✅ 새 스프레드시트 '{SPREADSHEET_NAME}'가 생성되었습니다.")
+        
+        # 워크시트 찾기 또는 생성
+        try:
+            worksheet = spreadsheet.worksheet("Stocks")
+        except gspread.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title="Stocks", rows=1000, cols=30)
+        
+        # 헤더 확인 및 추가
+        headers = worksheet.row_values(1)
+        expected_columns = ["Symbol", "Name", "InterestDate", "Note"]
+        for i in range(1, 11):
+            expected_columns.append(f"BuyDate{i}")
+            expected_columns.append(f"SellDate{i}")
+        
+        if not headers or headers != expected_columns:
+            # 헤더 업데이트
+            worksheet.clear()
+            worksheet.append_row(expected_columns)
+            st.info("✅ Google Sheets 헤더가 업데이트되었습니다.")
+        
+        return spreadsheet, worksheet
+    except Exception as e:
+        st.error(f"❌ Google Sheets 초기화 실패: {str(e)}")
+        st.stop()
+
+# Google Sheets에서 데이터 읽기
+@st.cache_data(ttl=60)  # 1분 캐싱 (데이터 변경 시 빠른 반영)
+def load_stocks():
+    """Google Sheets에서 종목 데이터를 로드합니다."""
+    try:
+        client = get_google_sheets_client()
+        spreadsheet = client.open(SPREADSHEET_NAME)
+        worksheet = spreadsheet.worksheet("Stocks")
+        
+        # 모든 데이터 가져오기
+        records = worksheet.get_all_records()
+        
+        if not records:
+            # 빈 DataFrame 반환 (헤더만 있는 경우)
+            columns = ["Symbol", "Name", "InterestDate", "Note"]
+            for i in range(1, 11):
+                columns.append(f"BuyDate{i}")
+                columns.append(f"SellDate{i}")
+            return pd.DataFrame(columns=columns)
+        
+        # DataFrame으로 변환
+        df = pd.DataFrame(records)
+        
+        # 빈 값 처리 (Google Sheets는 빈 셀을 빈 문자열로 반환)
+        df = df.replace("", pd.NA)
+        
+        return df
+    except Exception as e:
+        st.error(f"❌ 데이터 로드 실패: {str(e)}")
+        # 빈 DataFrame 반환
         columns = ["Symbol", "Name", "InterestDate", "Note"]
         for i in range(1, 11):
             columns.append(f"BuyDate{i}")
             columns.append(f"SellDate{i}")
-        df = pd.DataFrame(columns=columns)
-        df.to_csv(CSV_FILE, index=False, encoding="utf-8-sig")
-    else:
-        # 기존 CSV 파일이 있으면 컬럼 구조 업데이트
-        df = pd.read_csv(CSV_FILE, encoding="utf-8-sig")
-        columns = ["Symbol", "Name", "InterestDate", "Note"]
-        for i in range(1, 11):
-            if f"BuyDate{i}" not in df.columns:
-                df[f"BuyDate{i}"] = ""
-            if f"SellDate{i}" not in df.columns:
-                df[f"SellDate{i}"] = ""
-        # 기존 BuyDate, SellDate가 있으면 BuyDate1, SellDate1로 이동
-        if "BuyDate" in df.columns and "BuyDate1" not in df.columns:
-            df["BuyDate1"] = df["BuyDate"].fillna("")
-            df = df.drop(columns=["BuyDate"])
-        if "SellDate" in df.columns and "SellDate1" not in df.columns:
-            df["SellDate1"] = df["SellDate"].fillna("")
-            df = df.drop(columns=["SellDate"])
-        # 컬럼 순서 정리
-        new_columns = ["Symbol", "Name", "InterestDate", "Note"]
-        for i in range(1, 11):
-            new_columns.append(f"BuyDate{i}")
-            new_columns.append(f"SellDate{i}")
-        df = df.reindex(columns=new_columns, fill_value="")
-        df.to_csv(CSV_FILE, index=False, encoding="utf-8-sig")
+        return pd.DataFrame(columns=columns)
 
-# CSV 파일 읽기
-def load_stocks():
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE, encoding="utf-8-sig")
-        return df
-    columns = ["Symbol", "Name", "InterestDate", "Note"]
-    for i in range(1, 11):
-        columns.append(f"BuyDate{i}")
-        columns.append(f"SellDate{i}")
-    return pd.DataFrame(columns=columns)
-
-# CSV 파일 저장
+# Google Sheets에 데이터 저장
 def save_stocks(df):
-    df.to_csv(CSV_FILE, index=False, encoding="utf-8-sig")
+    """DataFrame을 Google Sheets에 저장합니다."""
+    try:
+        client = get_google_sheets_client()
+        spreadsheet = client.open(SPREADSHEET_NAME)
+        worksheet = spreadsheet.worksheet("Stocks")
+        
+        # 빈 값 처리 (pd.NA를 빈 문자열로 변환)
+        df = df.fillna("")
+        
+        # 헤더 포함 전체 데이터 준비
+        values = [df.columns.tolist()] + df.values.tolist()
+        
+        # 기존 데이터 지우고 새 데이터 쓰기
+        worksheet.clear()
+        worksheet.update(values, value_input_option='USER_ENTERED')
+        
+        # 캐시 무효화 (다음 로드 시 최신 데이터 가져오기)
+        load_stocks.clear()
+        
+    except Exception as e:
+        st.error(f"❌ 데이터 저장 실패: {str(e)}")
+        raise
 
 # 주가 데이터 가져오기 (캐싱)
 @st.cache_data(ttl=3600)  # 1시간 캐싱
@@ -201,7 +282,7 @@ def get_stock_data(symbol):
         return None
 
 # 초기화
-init_csv()
+init_google_sheet()
 
 # 새 종목 추가 콜백 함수
 def add_stock_callback():
