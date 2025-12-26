@@ -1313,7 +1313,17 @@ with tab2:
             current_qty = buy_qty - sell_qty
             current_invested = current_qty * avg_price
             
-            max_investment = stock.get('MarketCap', 0) / 10000
+            # MarketCap을 안전하게 숫자로 변환
+            market_cap_value = stock.get('MarketCap', 0)
+            try:
+                if pd.notna(market_cap_value) and str(market_cap_value).strip() != "":
+                    market_cap_value = float(market_cap_value)
+                else:
+                    market_cap_value = 0
+            except (ValueError, TypeError):
+                market_cap_value = 0
+            
+            max_investment = market_cap_value / 10000
             progress = (current_invested / max_investment * 100) if max_investment > 0 else 0
             
             portfolio_data.append({
@@ -1517,7 +1527,16 @@ with tab2:
                 except:
                     sell_txs = []
             
-            max_investment = market_cap / 10000
+            # MarketCap을 안전하게 숫자로 변환
+            try:
+                if pd.notna(market_cap) and str(market_cap).strip() != "":
+                    market_cap_value = float(market_cap)
+                else:
+                    market_cap_value = 0
+            except (ValueError, TypeError):
+                market_cap_value = 0
+            
+            max_investment = market_cap_value / 10000
             amount_per_installment = max_investment / installments if installments > 0 else 0
             
             # 투자 현황 계산
