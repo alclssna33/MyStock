@@ -291,6 +291,23 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
     }
     
+    /* 수정 버튼 스타일 (secondary 타입을 파란색 계열로) */
+    .stButton > button[kind="secondary"] {
+        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 6px !important;
+        padding: 0.4rem 1rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+    }
+    
     /* === 9. Dialog (팝업) 너비 조정 === */
     /* Streamlit Dialog 컨테이너 너비 확장 - 모든 가능한 선택자 */
     div[data-testid="stDialog"],
@@ -1777,10 +1794,12 @@ with tab2:
                             # 수정/기록 버튼
                             if existing_date or existing_price > 0 or existing_qty > 0:
                                 button_label = "수정"
+                                button_type = "secondary"  # 수정 버튼은 secondary (파란색 계열)
                             else:
                                 button_label = "기록"
+                                button_type = "primary"  # 기록 버튼은 primary (빨간색)
                             
-                            if st.form_submit_button(button_label, type="primary", use_container_width=True):
+                            if st.form_submit_button(button_label, type=button_type, use_container_width=True):
                                 # buy_txs 리스트 확장
                                 while len(buy_txs) < installments:
                                     buy_txs.append(None)
