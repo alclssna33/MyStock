@@ -1645,22 +1645,29 @@ with tab2:
                 stock_id = stock_data['id']
                 progress_pct = min(100, max(0, progress))
                 
+                # 디버깅: 진행률 확인용 (나중에 제거 가능)
+                # st.write(f"디버그: {name} - 진행률: {progress}%, progress_pct: {progress_pct}%")
+                
+                # 그라데이션을 더 명확하게 적용
+                # 진행률이 0%면 전체 연한 초록, 100%면 전체 진한 초록
                 badges_html += f"""
                 <button 
                     id="badge_btn_{stock_id}"
-                    onclick="window.parent.postMessage({{type: 'badge_click', stock_id: '{stock_id}'}}, '*')"
+                    onclick="handleBadgeClick('{stock_id}')"
                     style="
-                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%);
-                        border: 2px solid {dark_green};
-                        border-radius: 12px;
-                        padding: 0.8rem 1.5rem;
-                        color: #ffffff;
-                        font-weight: 600;
-                        font-size: 0.95rem;
-                        cursor: pointer;
-                        transition: all 0.3s;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                        font-family: 'Pretendard', sans-serif;
+                        background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%) !important;
+                        background-image: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%) !important;
+                        border: 2px solid {dark_green} !important;
+                        border-radius: 12px !important;
+                        padding: 0.8rem 1.5rem !important;
+                        color: #ffffff !important;
+                        font-weight: 600 !important;
+                        font-size: 0.95rem !important;
+                        cursor: pointer !important;
+                        transition: all 0.3s !important;
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+                        font-family: 'Pretendard', sans-serif !important;
+                        min-width: 120px !important;
                     "
                     onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
                     onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
@@ -1670,55 +1677,75 @@ with tab2:
                 """
             
             badges_html += '</div>'
+            
+            # 디버깅 정보 표시 (옵션)
+            with st.expander("🔍 디버깅 정보 (클릭하여 확인)", expanded=False):
+                st.write("**뱃지 정보:**")
+                for stock_data in sorted_stocks[:5]:  # 처음 5개만 표시
+                    st.write(f"- {stock_data['name']}: 진행률 {stock_data['progress']:.2f}%")
+            
             st.markdown(badges_html, unsafe_allow_html=True)
             
-            # JavaScript로 클릭 이벤트 처리 - Streamlit 버튼 클릭 시뮬레이션
+            # 추가 CSS로 강제 적용
+            st.markdown(f"""
+            <style>
+            button[id^="badge_btn_"] {{
+                background: linear-gradient(to right, {dark_green} var(--progress, 0%), {light_green} var(--progress, 0%)) !important;
+            }}
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # JavaScript로 클릭 이벤트 처리
             st.markdown("""
             <script>
             function handleBadgeClick(stockId) {
-                // Streamlit 버튼 찾기 및 클릭
-                const streamlitDoc = window.parent;
-                const buttons = streamlitDoc.querySelectorAll('button[data-testid*="baseButton"]');
+                console.log('뱃지 클릭:', stockId);
+                
+                // 현재 문서에서 Streamlit 버튼 찾기
+                const buttons = document.querySelectorAll('button[data-testid*="baseButton"]');
                 let clicked = false;
                 
                 buttons.forEach(btn => {
                     const key = btn.getAttribute('key');
                     if (key && key === 'badge_click_' + stockId) {
+                        console.log('Streamlit 버튼 찾음:', key);
                         btn.click();
                         clicked = true;
                     }
                 });
                 
-                // 버튼을 찾지 못한 경우 직접 expander 열기
                 if (!clicked) {
+                    console.log('Streamlit 버튼을 찾지 못함, 직접 expander 열기 시도');
+                    // 직접 expander 찾아서 열기
                     setTimeout(function() {
-                        const expanders = streamlitDoc.querySelectorAll('[data-testid="stExpander"]');
+                        const expanders = document.querySelectorAll('[data-testid="stExpander"]');
                         expanders.forEach(expander => {
                             const summary = expander.querySelector('summary');
-                            const details = expander.querySelector('[data-testid="stExpanderDetails"]');
-                            if (summary && details) {
-                                const text = details.textContent || '';
-                                // 종목명으로 찾기 (더 정확한 방법 필요)
-                                if (!expander.hasAttribute('open')) {
-                                    summary.click();
+                            if (summary) {
+                                const text = summary.textContent || '';
+                                // 종목명으로 찾기
+                                if (text.includes(stockId) || text.includes('📊')) {
+                                    if (!expander.hasAttribute('open')) {
+                                        summary.click();
+                                    }
+                                    expander.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                 }
-                                expander.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             }
                         });
                     }, 200);
                 }
             }
             
-            // 페이지 로드 후 이벤트 리스너 추가
+            // 페이지 로드 후 뱃지 버튼 확인
             setTimeout(function() {
-                document.querySelectorAll('[id^="badge_btn_"]').forEach(btn => {
-                    btn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        const stockId = this.id.replace('badge_btn_', '').replace('_2', '');
-                        handleBadgeClick(stockId);
-                    });
+                const badgeButtons = document.querySelectorAll('[id^="badge_btn_"]');
+                console.log('뱃지 버튼 개수:', badgeButtons.length);
+                
+                badgeButtons.forEach(btn => {
+                    console.log('뱃지 버튼 ID:', btn.id, '스타일:', btn.style.background);
+                    // 클릭 이벤트가 이미 onclick에 있으므로 추가 리스너는 필요 없음
                 });
-            }, 500);
+            }, 1000);
             </script>
             """, unsafe_allow_html=True)
             
