@@ -136,7 +136,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Google Sheets 설정
-SPREADSHEET_NAME = "stock_db"
+SPREADSHEET_NAME = "Integrated_Stock_DB" 
 SCOPE = ['https://spreadsheets.google.com/feeds',
          'https://www.googleapis.com/auth/drive']
 
