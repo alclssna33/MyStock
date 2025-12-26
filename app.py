@@ -1627,43 +1627,76 @@ with tab2:
         # 매수종목 뱃지 (그라데이션으로 진행률 표시)
         if portfolio_data:
             st.markdown("### 종목별 현황")
-            # 뱃지 스타일 CSS
-            st.markdown("""
-            <style>
-            .stock-badge {
-                display: inline-block;
-                padding: 0.8rem 1.5rem;
-                margin: 0.3rem;
-                border-radius: 12px;
-                color: #ffffff;
-                font-weight: 600;
-                font-size: 0.95rem;
-                cursor: pointer;
-                transition: all 0.3s;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                border: 2px solid;
-            }
-            .stock-badge:hover {
-                transform: scale(1.05);
-                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
-            }
-            </style>
-            """, unsafe_allow_html=True)
             
             # 뱃지들을 그리드로 표시
             sorted_stocks = sorted(portfolio_data, key=lambda x: x['totalInvested'], reverse=True)
             num_cols = min(9, len(sorted_stocks))
             badge_cols = st.columns(num_cols)
             
+            # 모든 뱃지 스타일을 한 번에 정의
+            light_green = "#86efac"  # 연한 초록색
+            dark_green = "#10b981"    # 진한 초록색
+            
+            badge_styles = ""
+            for idx, stock_data in enumerate(sorted_stocks):
+                progress = stock_data['progress']
+                stock_id = stock_data['id']
+                progress_pct = min(100, max(0, progress))
+                
+                # 더 강력한 CSS 선택자 사용
+                badge_styles += f"""
+                div[data-testid="stButton"] > button[key="badge_{stock_id}"],
+                button[key="badge_{stock_id}"] {{
+                    background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                    background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                    border: 2px solid {dark_green} !important;
+                    border-radius: 12px !important;
+                    color: #ffffff !important;
+                    font-weight: 600 !important;
+                    box-shadow: none !important;
+                }}
+                div[data-testid="stButton"] > button[key="badge_{stock_id}"]:hover,
+                button[key="badge_{stock_id}"]:hover {{
+                    background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                    background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                    transform: scale(1.05);
+                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
+                }}
+                """
+            
+            # CSS를 먼저 적용
+            st.markdown(f"""
+            <style>
+            {badge_styles}
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # JavaScript로 동적 스타일 적용 (CSS가 적용되지 않는 경우 대비)
+            js_code = "<script>"
+            for idx, stock_data in enumerate(sorted_stocks):
+                progress = stock_data['progress']
+                stock_id = stock_data['id']
+                progress_pct = min(100, max(0, progress))
+                js_code += f"""
+                setTimeout(function() {{
+                    const btn = document.querySelector('button[key="badge_{stock_id}"]');
+                    if (btn) {{
+                        btn.style.background = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
+                        btn.style.backgroundImage = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
+                        btn.style.border = '2px solid {dark_green}';
+                        btn.style.borderRadius = '12px';
+                        btn.style.color = '#ffffff';
+                        btn.style.fontWeight = '600';
+                    }}
+                }}, 100);
+                """
+            js_code += "</script>"
+            st.markdown(js_code, unsafe_allow_html=True)
+            
             for idx, stock_data in enumerate(sorted_stocks):
                 name = stock_data['name']
                 progress = stock_data['progress']
                 stock_id = stock_data['id']
-                
-                # 진행률에 따른 그라데이션: 전체 배경은 연한 초록색, 매수한 %만큼만 진한 초록색
-                light_green = "#86efac"  # 연한 초록색
-                dark_green = "#10b981"    # 진한 초록색
-                progress_pct = min(100, max(0, progress))
                 col_idx = idx % num_cols
                 
                 with badge_cols[col_idx]:
@@ -1672,32 +1705,70 @@ with tab2:
                         st.session_state[f"expand_{stock_id}"] = True
                         st.session_state[f"scroll_to_{stock_id}"] = True
                         st.rerun()
-                    
-                    # 뱃지 스타일 적용: 전체 배경 연한 초록, 진행률만큼 진한 초록
-                    st.markdown(f"""
-                    <style>
-                    button[key="badge_{stock_id}"] {{
-                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                        border: 2px solid {dark_green} !important;
-                        border-radius: 12px !important;
-                        color: #ffffff !important;
-                        font-weight: 600 !important;
-                    }}
-                    </style>
-                    """, unsafe_allow_html=True)
             
             # 두 번째 줄 뱃지 (필요한 경우)
             if len(sorted_stocks) > num_cols:
                 remaining_stocks = sorted_stocks[num_cols:]
                 remaining_cols = st.columns(min(9, len(remaining_stocks)))
+                
+                # 두 번째 줄 뱃지 스타일 정의
+                badge_styles_2 = ""
                 for idx, stock_data in enumerate(remaining_stocks):
-                    name = stock_data['name']
                     progress = stock_data['progress']
                     stock_id = stock_data['id']
-                    
-                    light_green = "#86efac"
-                    dark_green = "#10b981"
                     progress_pct = min(100, max(0, progress))
+                    
+                    badge_styles_2 += f"""
+                    div[data-testid="stButton"] > button[key="badge_{stock_id}_2"],
+                    button[key="badge_{stock_id}_2"] {{
+                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                        background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                        border: 2px solid {dark_green} !important;
+                        border-radius: 12px !important;
+                        color: #ffffff !important;
+                        font-weight: 600 !important;
+                        box-shadow: none !important;
+                    }}
+                    div[data-testid="stButton"] > button[key="badge_{stock_id}_2"]:hover,
+                    button[key="badge_{stock_id}_2"]:hover {{
+                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                        background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                        transform: scale(1.05);
+                        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
+                    }}
+                    """
+                
+                st.markdown(f"""
+                <style>
+                {badge_styles_2}
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # 두 번째 줄 JavaScript 스타일 적용
+                js_code_2 = "<script>"
+                for idx, stock_data in enumerate(remaining_stocks):
+                    progress = stock_data['progress']
+                    stock_id = stock_data['id']
+                    progress_pct = min(100, max(0, progress))
+                    js_code_2 += f"""
+                    setTimeout(function() {{
+                        const btn = document.querySelector('button[key="badge_{stock_id}_2"]');
+                        if (btn) {{
+                            btn.style.background = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
+                            btn.style.backgroundImage = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
+                            btn.style.border = '2px solid {dark_green}';
+                            btn.style.borderRadius = '12px';
+                            btn.style.color = '#ffffff';
+                            btn.style.fontWeight = '600';
+                        }}
+                    }}, 100);
+                    """
+                js_code_2 += "</script>"
+                st.markdown(js_code_2, unsafe_allow_html=True)
+                
+                for idx, stock_data in enumerate(remaining_stocks):
+                    name = stock_data['name']
+                    stock_id = stock_data['id']
                     col_idx = idx % len(remaining_cols)
                     
                     with remaining_cols[col_idx]:
@@ -1705,18 +1776,6 @@ with tab2:
                             st.session_state[f"expand_{stock_id}"] = True
                             st.session_state[f"scroll_to_{stock_id}"] = True
                             st.rerun()
-                        
-                        st.markdown(f"""
-                        <style>
-                        button[key="badge_{stock_id}_2"] {{
-                            background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                            border: 2px solid {dark_green} !important;
-                            border-radius: 12px !important;
-                            color: #ffffff !important;
-                            font-weight: 600 !important;
-                        }}
-                        </style>
-                        """, unsafe_allow_html=True)
         
         # 전체 현황판 (드롭다운 기능 포함)
         if portfolio_data:
