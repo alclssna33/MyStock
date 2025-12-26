@@ -290,6 +290,193 @@ st.markdown("""
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
     }
+    
+    /* === 9. Dialog (팝업) 너비 조정 === */
+    /* Streamlit Dialog 컨테이너 너비 확장 - 모든 가능한 선택자 */
+    div[data-testid="stDialog"],
+    div[role="dialog"],
+    div[class*="dialog"],
+    div[class*="Dialog"],
+    section[data-testid="stDialog"],
+    section[role="dialog"],
+    /* BaseWeb Modal/Dialog 스타일 */
+    div[data-baseweb="modal"],
+    div[data-baseweb="Modal"],
+    /* 일반적인 모달 클래스 */
+    .modal,
+    .Modal,
+    [class*="modal"],
+    [class*="Modal"] {
+        max-width: 95vw !important;
+        width: 95vw !important;
+        min-width: 1400px !important;
+    }
+    
+    /* Dialog 내부 컨텐츠 영역 */
+    div[data-testid="stDialog"] > div,
+    div[role="dialog"] > div,
+    section[data-testid="stDialog"] > div,
+    section[role="dialog"] > div {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    
+    /* Dialog 내부의 Streamlit 컨테이너 */
+    div[data-testid="stDialog"] div[data-testid="stVerticalBlock"],
+    div[data-testid="stDialog"] div[data-testid="stHorizontalBlock"],
+    div[role="dialog"] div[data-testid="stVerticalBlock"],
+    div[role="dialog"] div[data-testid="stHorizontalBlock"],
+    section[data-testid="stDialog"] div[data-testid="stVerticalBlock"],
+    section[data-testid="stDialog"] div[data-testid="stHorizontalBlock"] {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    
+    /* Dialog 내부의 컬럼 레이아웃 */
+    div[data-testid="stDialog"] div[data-testid="column"],
+    div[role="dialog"] div[data-testid="column"],
+    section[data-testid="stDialog"] div[data-testid="column"] {
+        max-width: 100% !important;
+        flex: 1 1 auto !important;
+    }
+    
+    /* Dialog 내부의 모든 컨테이너 */
+    div[data-testid="stDialog"] div[data-testid="stContainer"],
+    div[role="dialog"] div[data-testid="stContainer"],
+    section[data-testid="stDialog"] div[data-testid="stContainer"] {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    
+    /* === 10. Dialog (팝업) 다크모드 스타일 === */
+    /* Dialog 배경색 - 다크모드 */
+    div[data-testid="stDialog"],
+    div[role="dialog"],
+    section[data-testid="stDialog"],
+    section[role="dialog"],
+    div[data-baseweb="modal"],
+    div[data-baseweb="Modal"] {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 모든 텍스트 - 흰색 */
+    div[data-testid="stDialog"] *,
+    div[role="dialog"] *,
+    section[data-testid="stDialog"] *,
+    section[role="dialog"] * {
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 제목, 헤더 */
+    div[data-testid="stDialog"] h1,
+    div[data-testid="stDialog"] h2,
+    div[data-testid="stDialog"] h3,
+    div[data-testid="stDialog"] h4,
+    div[data-testid="stDialog"] h5,
+    div[data-testid="stDialog"] h6,
+    div[data-testid="stDialog"] p,
+    div[data-testid="stDialog"] span,
+    div[data-testid="stDialog"] label,
+    div[role="dialog"] h1,
+    div[role="dialog"] h2,
+    div[role="dialog"] h3,
+    div[role="dialog"] h4,
+    div[role="dialog"] h5,
+    div[role="dialog"] h6,
+    div[role="dialog"] p,
+    div[role="dialog"] span,
+    div[role="dialog"] label {
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 컨테이너 배경 - 투명 또는 다크 */
+    div[data-testid="stDialog"] div[data-testid="stVerticalBlock"],
+    div[data-testid="stDialog"] div[data-testid="stHorizontalBlock"],
+    div[data-testid="stDialog"] div[data-testid="stContainer"],
+    div[role="dialog"] div[data-testid="stVerticalBlock"],
+    div[role="dialog"] div[data-testid="stHorizontalBlock"],
+    div[role="dialog"] div[data-testid="stContainer"] {
+        background: transparent !important;
+    }
+    
+    /* Dialog 내부 입력 필드 - 흰색 배경, 검은색 글자 (입력창은 밝게 유지) */
+    div[data-testid="stDialog"] input,
+    div[data-testid="stDialog"] textarea,
+    div[role="dialog"] input,
+    div[role="dialog"] textarea {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    
+    /* Dialog 내부 Selectbox - 흰색 배경, 검은색 글자 */
+    div[data-testid="stDialog"] div[data-baseweb="select"] > div,
+    div[role="dialog"] div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    
+    div[data-testid="stDialog"] div[data-baseweb="select"] > div *,
+    div[role="dialog"] div[data-baseweb="select"] > div * {
+        color: #000000 !important;
+    }
+    
+    /* Dialog 내부 달력 - 흰색 배경, 검은색 글자 */
+    div[data-testid="stDialog"] div[data-baseweb="calendar"],
+    div[role="dialog"] div[data-baseweb="calendar"] {
+        background-color: #FFFFFF !important;
+    }
+    
+    div[data-testid="stDialog"] div[data-baseweb="calendar"] *,
+    div[role="dialog"] div[data-baseweb="calendar"] * {
+        color: #000000 !important;
+    }
+    
+    /* Dialog 내부 버튼 - 기존 스타일 유지 */
+    div[data-testid="stDialog"] .stButton > button,
+    div[role="dialog"] .stButton > button {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 메트릭 (Metric) - 흰색 텍스트 */
+    div[data-testid="stDialog"] [data-testid="stMetricValue"],
+    div[data-testid="stDialog"] [data-testid="stMetricLabel"],
+    div[role="dialog"] [data-testid="stMetricValue"],
+    div[role="dialog"] [data-testid="stMetricLabel"] {
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 Progress Bar 배경 */
+    div[data-testid="stDialog"] [data-testid="stProgressBar"] > div,
+    div[role="dialog"] [data-testid="stProgressBar"] > div {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* Dialog 내부 Markdown 텍스트 */
+    div[data-testid="stDialog"] div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stDialog"] div[data-testid="stMarkdownContainer"] span,
+    div[data-testid="stDialog"] div[data-testid="stMarkdownContainer"] div,
+    div[role="dialog"] div[data-testid="stMarkdownContainer"] p,
+    div[role="dialog"] div[data-testid="stMarkdownContainer"] span,
+    div[role="dialog"] div[data-testid="stMarkdownContainer"] div {
+        color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 Info/Success/Warning 메시지 배경 조정 */
+    div[data-testid="stDialog"] [data-testid="stNotification"],
+    div[role="dialog"] [data-testid="stNotification"] {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+    
+    /* Dialog 내부 Divider */
+    div[data-testid="stDialog"] hr,
+    div[data-testid="stDialog"] [data-testid="stDivider"],
+    div[role="dialog"] hr,
+    div[role="dialog"] [data-testid="stDivider"] {
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
