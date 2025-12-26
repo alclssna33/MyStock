@@ -626,169 +626,169 @@ with tab1:
                 </style>
                     """, unsafe_allow_html=True)
                     with st.expander("📝 정보 수정하기", expanded=False):
-                    # 날짜 데이터 변환 (문자열 -> date 객체)
-                    def parse_date(date_str):
-                        if pd.notna(date_str) and date_str != "":
-                            try:
-                                return pd.to_datetime(date_str).date()
-                            except:
-                                return None
-                        return None
-                    
-                    edit_interest_date = st.date_input(
-                        "관심일",
-                        value=parse_date(interest_date),
-                        key=f"edit_interest_date_{symbol}"
-                    )
-                    
-                    # 매수일 입력 (동적 추가)
-                    st.write("**매수일**")
-                    buy_date_inputs = []
-                    buy_date_count = len([d for d in buy_dates if d != ""]) or 1
-                    if buy_date_count == 0:
-                        buy_date_count = 1
-                    
-                    # 세션 상태로 매수일 개수 관리
-                    if f'buy_date_count_{symbol}' not in st.session_state:
-                        st.session_state[f'buy_date_count_{symbol}'] = max(buy_date_count, 1)
-                    
-                    for i in range(st.session_state[f'buy_date_count_{symbol}']):
-                        col_date, col_delete = st.columns([4, 1])
-                        with col_date:
-                            buy_date_inputs.append(st.date_input(
-                                f"매수일 {i+1}",
-                                value=parse_date(buy_dates[i]) if i < len(buy_dates) else None,
-                                key=f"edit_buy_date_{i}_{symbol}",
-                                label_visibility="collapsed"
-                            ))
-                        with col_delete:
-                            if st.button("🗑️", key=f"delete_buy_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                # 즉시 CSV에서 해당 날짜 삭제
-                                df_stocks = load_stocks()
-                                mask = df_stocks['Symbol'] == symbol
-                                if mask.any():
-                                    # i는 0부터 시작하므로 BuyDate{i+1}에 해당
-                                    date_idx = i + 1
-                                    # 해당 인덱스의 BuyDate를 None으로 명시적 할당
-                                    df_stocks.loc[mask, f'BuyDate{date_idx}'] = None
-                                    # 뒤의 날짜들을 앞으로 이동
-                                    for j in range(date_idx, 10):
-                                        next_val = df_stocks.loc[mask, f'BuyDate{j+1}'].values[0] if mask.any() else None
-                                        if pd.notna(next_val) and str(next_val).strip() != "":
-                                            df_stocks.loc[mask, f'BuyDate{j}'] = str(next_val).strip()
-                                        else:
-                                            df_stocks.loc[mask, f'BuyDate{j}'] = ""
-                                    df_stocks.loc[mask, 'BuyDate10'] = ""
-                                    # 즉시 저장
-                                    save_stocks(df_stocks)
-                                    st.success("삭제되었습니다!")
-                                    # 0.5초 대기
-                                    time.sleep(0.5)
-                                # 개수 조정
-                                if st.session_state[f'buy_date_count_{symbol}'] > 0:
-                                    st.session_state[f'buy_date_count_{symbol}'] -= 1
-                                if st.session_state[f'buy_date_count_{symbol}'] == 0:
-                                    st.session_state[f'buy_date_count_{symbol}'] = 1
+                        # 날짜 데이터 변환 (문자열 -> date 객체)
+                        def parse_date(date_str):
+                            if pd.notna(date_str) and date_str != "":
+                                try:
+                                    return pd.to_datetime(date_str).date()
+                                except:
+                                    return None
+                            return None
+                        
+                        edit_interest_date = st.date_input(
+                            "관심일",
+                            value=parse_date(interest_date),
+                            key=f"edit_interest_date_{symbol}"
+                        )
+                        
+                        # 매수일 입력 (동적 추가)
+                        st.write("**매수일**")
+                        buy_date_inputs = []
+                        buy_date_count = len([d for d in buy_dates if d != ""]) or 1
+                        if buy_date_count == 0:
+                            buy_date_count = 1
+                        
+                        # 세션 상태로 매수일 개수 관리
+                        if f'buy_date_count_{symbol}' not in st.session_state:
+                            st.session_state[f'buy_date_count_{symbol}'] = max(buy_date_count, 1)
+                        
+                        for i in range(st.session_state[f'buy_date_count_{symbol}']):
+                            col_date, col_delete = st.columns([4, 1])
+                            with col_date:
+                                buy_date_inputs.append(st.date_input(
+                                    f"매수일 {i+1}",
+                                    value=parse_date(buy_dates[i]) if i < len(buy_dates) else None,
+                                    key=f"edit_buy_date_{i}_{symbol}",
+                                    label_visibility="collapsed"
+                                ))
+                            with col_delete:
+                                if st.button("🗑️", key=f"delete_buy_date_{i}_{symbol}", help="삭제", type="secondary"):
+                                    # 즉시 CSV에서 해당 날짜 삭제
+                                    df_stocks = load_stocks()
+                                    mask = df_stocks['Symbol'] == symbol
+                                    if mask.any():
+                                        # i는 0부터 시작하므로 BuyDate{i+1}에 해당
+                                        date_idx = i + 1
+                                        # 해당 인덱스의 BuyDate를 None으로 명시적 할당
+                                        df_stocks.loc[mask, f'BuyDate{date_idx}'] = None
+                                        # 뒤의 날짜들을 앞으로 이동
+                                        for j in range(date_idx, 10):
+                                            next_val = df_stocks.loc[mask, f'BuyDate{j+1}'].values[0] if mask.any() else None
+                                            if pd.notna(next_val) and str(next_val).strip() != "":
+                                                df_stocks.loc[mask, f'BuyDate{j}'] = str(next_val).strip()
+                                            else:
+                                                df_stocks.loc[mask, f'BuyDate{j}'] = ""
+                                        df_stocks.loc[mask, 'BuyDate10'] = ""
+                                        # 즉시 저장
+                                        save_stocks(df_stocks)
+                                        st.success("삭제되었습니다!")
+                                        # 0.5초 대기
+                                        time.sleep(0.5)
+                                    # 개수 조정
+                                    if st.session_state[f'buy_date_count_{symbol}'] > 0:
+                                        st.session_state[f'buy_date_count_{symbol}'] -= 1
+                                    if st.session_state[f'buy_date_count_{symbol}'] == 0:
+                                        st.session_state[f'buy_date_count_{symbol}'] = 1
+                                    st.rerun()
+                        
+                        # 매수일 추가 버튼
+                        if st.button("➕ 매수일 추가", key=f"add_buy_date_{symbol}"):
+                            if st.session_state[f'buy_date_count_{symbol}'] < 10:
+                                st.session_state[f'buy_date_count_{symbol}'] += 1
                                 st.rerun()
-                    
-                    # 매수일 추가 버튼
-                    if st.button("➕ 매수일 추가", key=f"add_buy_date_{symbol}"):
-                        if st.session_state[f'buy_date_count_{symbol}'] < 10:
-                            st.session_state[f'buy_date_count_{symbol}'] += 1
-                            st.rerun()
-                        else:
-                            st.warning("최대 10개까지 추가 가능합니다.")
-                    
-                    # 매도일 입력 (동적 추가)
-                    st.write("**매도일**")
-                    sell_date_inputs = []
-                    sell_date_count = len([d for d in sell_dates if d != ""]) or 1
-                    if sell_date_count == 0:
-                        sell_date_count = 1
-                    
-                    # 세션 상태로 매도일 개수 관리
-                    if f'sell_date_count_{symbol}' not in st.session_state:
-                        st.session_state[f'sell_date_count_{symbol}'] = max(sell_date_count, 1)
-                    
-                    for i in range(st.session_state[f'sell_date_count_{symbol}']):
-                        col_date, col_delete = st.columns([4, 1])
-                        with col_date:
-                            sell_date_inputs.append(st.date_input(
-                                f"매도일 {i+1}",
-                                value=parse_date(sell_dates[i]) if i < len(sell_dates) else None,
-                                key=f"edit_sell_date_{i}_{symbol}",
-                                label_visibility="collapsed"
-                            ))
-                        with col_delete:
-                            if st.button("🗑️", key=f"delete_sell_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                # 즉시 CSV에서 해당 날짜 삭제
-                                df_stocks = load_stocks()
-                                mask = df_stocks['Symbol'] == symbol
-                                if mask.any():
-                                    # i는 0부터 시작하므로 SellDate{i+1}에 해당
-                                    date_idx = i + 1
-                                    # 해당 인덱스의 SellDate를 None으로 명시적 할당
-                                    df_stocks.loc[mask, f'SellDate{date_idx}'] = None
-                                    # 뒤의 날짜들을 앞으로 이동
-                                    for j in range(date_idx, 10):
-                                        next_val = df_stocks.loc[mask, f'SellDate{j+1}'].values[0] if mask.any() else None
-                                        if pd.notna(next_val) and str(next_val).strip() != "":
-                                            df_stocks.loc[mask, f'SellDate{j}'] = str(next_val).strip()
-                                        else:
-                                            df_stocks.loc[mask, f'SellDate{j}'] = ""
-                                    df_stocks.loc[mask, 'SellDate10'] = ""
-                                    # 즉시 저장
-                                    save_stocks(df_stocks)
-                                    st.success("삭제되었습니다!")
-                                    # 0.5초 대기
-                                    time.sleep(0.5)
-                                # 개수 조정
-                                if st.session_state[f'sell_date_count_{symbol}'] > 0:
-                                    st.session_state[f'sell_date_count_{symbol}'] -= 1
-                                if st.session_state[f'sell_date_count_{symbol}'] == 0:
-                                    st.session_state[f'sell_date_count_{symbol}'] = 1
+                            else:
+                                st.warning("최대 10개까지 추가 가능합니다.")
+                        
+                        # 매도일 입력 (동적 추가)
+                        st.write("**매도일**")
+                        sell_date_inputs = []
+                        sell_date_count = len([d for d in sell_dates if d != ""]) or 1
+                        if sell_date_count == 0:
+                            sell_date_count = 1
+                        
+                        # 세션 상태로 매도일 개수 관리
+                        if f'sell_date_count_{symbol}' not in st.session_state:
+                            st.session_state[f'sell_date_count_{symbol}'] = max(sell_date_count, 1)
+                        
+                        for i in range(st.session_state[f'sell_date_count_{symbol}']):
+                            col_date, col_delete = st.columns([4, 1])
+                            with col_date:
+                                sell_date_inputs.append(st.date_input(
+                                    f"매도일 {i+1}",
+                                    value=parse_date(sell_dates[i]) if i < len(sell_dates) else None,
+                                    key=f"edit_sell_date_{i}_{symbol}",
+                                    label_visibility="collapsed"
+                                ))
+                            with col_delete:
+                                if st.button("🗑️", key=f"delete_sell_date_{i}_{symbol}", help="삭제", type="secondary"):
+                                    # 즉시 CSV에서 해당 날짜 삭제
+                                    df_stocks = load_stocks()
+                                    mask = df_stocks['Symbol'] == symbol
+                                    if mask.any():
+                                        # i는 0부터 시작하므로 SellDate{i+1}에 해당
+                                        date_idx = i + 1
+                                        # 해당 인덱스의 SellDate를 None으로 명시적 할당
+                                        df_stocks.loc[mask, f'SellDate{date_idx}'] = None
+                                        # 뒤의 날짜들을 앞으로 이동
+                                        for j in range(date_idx, 10):
+                                            next_val = df_stocks.loc[mask, f'SellDate{j+1}'].values[0] if mask.any() else None
+                                            if pd.notna(next_val) and str(next_val).strip() != "":
+                                                df_stocks.loc[mask, f'SellDate{j}'] = str(next_val).strip()
+                                            else:
+                                                df_stocks.loc[mask, f'SellDate{j}'] = ""
+                                        df_stocks.loc[mask, 'SellDate10'] = ""
+                                        # 즉시 저장
+                                        save_stocks(df_stocks)
+                                        st.success("삭제되었습니다!")
+                                        # 0.5초 대기
+                                        time.sleep(0.5)
+                                    # 개수 조정
+                                    if st.session_state[f'sell_date_count_{symbol}'] > 0:
+                                        st.session_state[f'sell_date_count_{symbol}'] -= 1
+                                    if st.session_state[f'sell_date_count_{symbol}'] == 0:
+                                        st.session_state[f'sell_date_count_{symbol}'] = 1
+                                    st.rerun()
+                        
+                        # 매도일 추가 버튼
+                        if st.button("➕ 매도일 추가", key=f"add_sell_date_{symbol}"):
+                            if st.session_state[f'sell_date_count_{symbol}'] < 10:
+                                st.session_state[f'sell_date_count_{symbol}'] += 1
                                 st.rerun()
-                    
-                    # 매도일 추가 버튼
-                    if st.button("➕ 매도일 추가", key=f"add_sell_date_{symbol}"):
-                        if st.session_state[f'sell_date_count_{symbol}'] < 10:
-                            st.session_state[f'sell_date_count_{symbol}'] += 1
-                            st.rerun()
-                        else:
-                            st.warning("최대 10개까지 추가 가능합니다.")
-                    
-                    edit_note = st.text_area(
-                        "메모",
-                        value=note if pd.notna(note) else "",
-                        key=f"edit_note_{symbol}"
-                    )
-                    
-                    edit_submitted = st.button("수정 저장", key="edit_submit_button")
-                    
-                    if edit_submitted:
-                        df_stocks = load_stocks()
-                        # Symbol 기준으로 해당 종목 찾아서 업데이트
-                        mask = df_stocks['Symbol'] == symbol
-                        if mask.any():
-                            df_stocks.loc[mask, 'InterestDate'] = edit_interest_date.strftime("%Y-%m-%d") if edit_interest_date else ""
-                            # BuyDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
-                            buy_dates_to_save = [d for d in buy_date_inputs if d is not None]
-                            for i in range(1, 11):
-                                if i <= len(buy_dates_to_save):
-                                    df_stocks.loc[mask, f'BuyDate{i}'] = buy_dates_to_save[i-1].strftime("%Y-%m-%d")
-                                else:
-                                    df_stocks.loc[mask, f'BuyDate{i}'] = ""
-                            # SellDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
-                            sell_dates_to_save = [d for d in sell_date_inputs if d is not None]
-                            for i in range(1, 11):
-                                if i <= len(sell_dates_to_save):
-                                    df_stocks.loc[mask, f'SellDate{i}'] = sell_dates_to_save[i-1].strftime("%Y-%m-%d")
-                                else:
-                                    df_stocks.loc[mask, f'SellDate{i}'] = ""
-                            df_stocks.loc[mask, 'Note'] = edit_note if edit_note else ""
-                            save_stocks(df_stocks)
-                            st.success("수정되었습니다!")
-                            st.rerun()
+                            else:
+                                st.warning("최대 10개까지 추가 가능합니다.")
+                        
+                        edit_note = st.text_area(
+                            "메모",
+                            value=note if pd.notna(note) else "",
+                            key=f"edit_note_{symbol}"
+                        )
+                        
+                        edit_submitted = st.button("수정 저장", key="edit_submit_button")
+                        
+                        if edit_submitted:
+                            df_stocks = load_stocks()
+                            # Symbol 기준으로 해당 종목 찾아서 업데이트
+                            mask = df_stocks['Symbol'] == symbol
+                            if mask.any():
+                                df_stocks.loc[mask, 'InterestDate'] = edit_interest_date.strftime("%Y-%m-%d") if edit_interest_date else ""
+                                # BuyDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
+                                buy_dates_to_save = [d for d in buy_date_inputs if d is not None]
+                                for i in range(1, 11):
+                                    if i <= len(buy_dates_to_save):
+                                        df_stocks.loc[mask, f'BuyDate{i}'] = buy_dates_to_save[i-1].strftime("%Y-%m-%d")
+                                    else:
+                                        df_stocks.loc[mask, f'BuyDate{i}'] = ""
+                                # SellDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
+                                sell_dates_to_save = [d for d in sell_date_inputs if d is not None]
+                                for i in range(1, 11):
+                                    if i <= len(sell_dates_to_save):
+                                        df_stocks.loc[mask, f'SellDate{i}'] = sell_dates_to_save[i-1].strftime("%Y-%m-%d")
+                                    else:
+                                        df_stocks.loc[mask, f'SellDate{i}'] = ""
+                                df_stocks.loc[mask, 'Note'] = edit_note if edit_note else ""
+                                save_stocks(df_stocks)
+                                st.success("수정되었습니다!")
+                                st.rerun()
                 
                 # 주가 데이터 가져오기
                 with st.spinner(f"{name} ({symbol}) 데이터를 불러오는 중..."):
