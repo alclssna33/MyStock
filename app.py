@@ -248,48 +248,42 @@ def init_google_sheet():
             spreadsheet = client.create(SPREADSHEET_NAME)
             st.info(f"✅ 새 스프레드시트 '{SPREADSHEET_NAME}'가 생성되었습니다.")
         
-        # 워크시트 찾기 또는 생성
+        # 통합 워크시트 찾기 또는 생성 (Stocks 시트로 통합)
         try:
-            worksheet = spreadsheet.worksheet("Stocks1")
+            worksheet = spreadsheet.worksheet("Stocks")
         except gspread.WorksheetNotFound:
-            worksheet = spreadsheet.add_worksheet(title="Stocks1", rows=1000, cols=30)
+            worksheet = spreadsheet.add_worksheet(title="Stocks", rows=1000, cols=20)
         
-        # 헤더 확인 및 추가
+        # 헤더 확인 및 추가 (통합 구조)
         headers = worksheet.row_values(1)
-        expected_columns = ["Symbol", "Name", "InterestDate", "Note"]
-        for i in range(1, 11):
-            expected_columns.append(f"BuyDate{i}")
-            expected_columns.append(f"SellDate{i}")
+        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
         
         if not headers or headers != expected_columns:
             # 헤더 업데이트
             worksheet.clear()
             worksheet.append_row(expected_columns)
-            st.info("✅ Google Sheets 헤더가 업데이트되었습니다.")
+            st.info("✅ Google Sheets 헤더가 통합 구조로 업데이트되었습니다.")
         
         return spreadsheet, worksheet
     except Exception as e:
         st.error(f"❌ Google Sheets 초기화 실패: {str(e)}")
         st.stop()
 
-# Google Sheets에서 데이터 읽기
+# Google Sheets에서 데이터 읽기 (통합 시트)
 @st.cache_data(ttl=60)  # 1분 캐싱 (데이터 변경 시 빠른 반영)
 def load_stocks():
-    """Google Sheets에서 종목 데이터를 로드합니다."""
+    """Google Sheets에서 종목 데이터를 로드합니다 (통합 시트)."""
     try:
         client = get_google_sheets_client()
         spreadsheet = client.open(SPREADSHEET_NAME)
-        worksheet = spreadsheet.worksheet("Stocks1")
+        worksheet = spreadsheet.worksheet("Stocks")
         
         # 모든 데이터 가져오기
         records = worksheet.get_all_records()
         
         if not records:
             # 빈 DataFrame 반환 (헤더만 있는 경우)
-            columns = ["Symbol", "Name", "InterestDate", "Note"]
-            for i in range(1, 11):
-                columns.append(f"BuyDate{i}")
-                columns.append(f"SellDate{i}")
+            columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
             return pd.DataFrame(columns=columns)
         
         # DataFrame으로 변환
@@ -298,26 +292,36 @@ def load_stocks():
         # 빈 값 처리 (Google Sheets는 빈 셀을 빈 문자열로 반환)
         df = df.replace("", pd.NA)
         
+        # BuyTransactions, SellTransactions가 문자열이면 JSON 파싱 (나중에 사용 시)
+        # 여기서는 그대로 유지 (필요시 파싱)
+        
         return df
     except Exception as e:
         st.error(f"❌ 데이터 로드 실패: {str(e)}")
         # 빈 DataFrame 반환
-        columns = ["Symbol", "Name", "InterestDate", "Note"]
-        for i in range(1, 11):
-            columns.append(f"BuyDate{i}")
-            columns.append(f"SellDate{i}")
+        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
         return pd.DataFrame(columns=columns)
 
-# Google Sheets에 데이터 저장
+# Google Sheets에 데이터 저장 (통합 시트)
 def save_stocks(df):
-    """DataFrame을 Google Sheets에 저장합니다."""
+    """DataFrame을 Google Sheets에 저장합니다 (통합 시트)."""
     try:
         client = get_google_sheets_client()
         spreadsheet = client.open(SPREADSHEET_NAME)
-        worksheet = spreadsheet.worksheet("Stocks1")
+        worksheet = spreadsheet.worksheet("Stocks")
         
         # 빈 값 처리 (pd.NA를 빈 문자열로 변환)
         df = df.fillna("")
+        
+        # BuyTransactions, SellTransactions가 리스트/딕셔너리면 JSON 문자열로 변환
+        if 'BuyTransactions' in df.columns:
+            df['BuyTransactions'] = df['BuyTransactions'].apply(
+                lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]')
+            )
+        if 'SellTransactions' in df.columns:
+            df['SellTransactions'] = df['SellTransactions'].apply(
+                lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]')
+            )
         
         # 헤더 포함 전체 데이터 준비
         values = [df.columns.tolist()] + df.values.tolist()
@@ -392,54 +396,83 @@ def get_stock_data(symbol):
 # 분할 매수 플래너 관련 함수들
 # ==========================================
 
-# 분할 매수 플래너 데이터 로드
+# 분할 매수 플래너 데이터 로드 (통합 시트 사용)
 @st.cache_data(ttl=60)
 def load_split_purchase_data():
-    """SplitPurchasePlanner 시트에서 데이터를 로드합니다."""
+    """통합 Stocks 시트에서 분할 매수 플래너 데이터를 로드합니다."""
     try:
         client = get_google_sheets_client()
         spreadsheet = client.open(SPREADSHEET_NAME)
         
         try:
-            ws = spreadsheet.worksheet("SplitPurchasePlanner")
+            ws = spreadsheet.worksheet("Stocks")
             records = ws.get_all_records()
             
             if not records:
-                return pd.DataFrame(columns=["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+                return pd.DataFrame(columns=["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
             
             df = pd.DataFrame(records)
+            
+            # MarketCap이나 Installments가 있는 종목만 필터링 (분할 매수 플래너용)
+            # 또는 모든 데이터 반환 (필터링은 UI에서 처리)
             return df
         except gspread.WorksheetNotFound:
-            # 워크시트가 없으면 생성
-            ws = spreadsheet.add_worksheet(title="SplitPurchasePlanner", rows=1000, cols=10)
-            headers = ["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
+            # 워크시트가 없으면 생성 (init_google_sheet에서 처리되지만 안전장치)
+            ws = spreadsheet.add_worksheet(title="Stocks", rows=1000, cols=20)
+            headers = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
             ws.append_row(headers)
             return pd.DataFrame(columns=headers)
     except Exception as e:
         st.error(f"❌ 분할 매수 데이터 로드 실패: {str(e)}")
-        return pd.DataFrame(columns=["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+        return pd.DataFrame(columns=["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
 
-# 분할 매수 플래너 데이터 저장
+# 분할 매수 플래너 데이터 저장 (통합 시트 사용)
 def save_split_purchase_data(df):
-    """SplitPurchasePlanner 시트에 데이터를 저장합니다."""
+    """통합 Stocks 시트에 분할 매수 플래너 데이터를 저장합니다."""
     try:
         client = get_google_sheets_client()
         spreadsheet = client.open(SPREADSHEET_NAME)
-        ws = spreadsheet.worksheet("SplitPurchasePlanner")
+        ws = spreadsheet.worksheet("Stocks")
+        
+        # 전체 데이터 로드
+        all_df = load_stocks()
         
         # JSON 컬럼을 문자열로 변환
         df = df.copy()
         if 'BuyTransactions' in df.columns:
-            df['BuyTransactions'] = df['BuyTransactions'].apply(lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]'))
+            df['BuyTransactions'] = df['BuyTransactions'].apply(
+                lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]')
+            )
         if 'SellTransactions' in df.columns:
-            df['SellTransactions'] = df['SellTransactions'].apply(lambda x: json.dumps(x) if isinstance(x, list) else (x if x else '[]'))
+            df['SellTransactions'] = df['SellTransactions'].apply(
+                lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]')
+            )
         
         df = df.fillna("")
-        values = [df.columns.tolist()] + df.values.tolist()
         
+        # Symbol 기준으로 기존 데이터 업데이트 또는 추가
+        for idx, row in df.iterrows():
+            symbol = row.get('Symbol', '')
+            if symbol:
+                # 기존 데이터에서 해당 Symbol 찾기
+                mask = all_df['Symbol'] == symbol
+                if mask.any():
+                    # 업데이트
+                    all_df.loc[mask, row.index] = row.values
+                else:
+                    # 새 행 추가
+                    all_df = pd.concat([all_df, pd.DataFrame([row])], ignore_index=True)
+        
+        # 빈 값 처리
+        all_df = all_df.fillna("")
+        
+        # 전체 데이터 저장
+        values = [all_df.columns.tolist()] + all_df.values.tolist()
         ws.clear()
         ws.update(values, value_input_option='USER_ENTERED')
         
+        # 캐시 무효화
+        load_stocks.clear()
         load_split_purchase_data.clear()
     except Exception as e:
         st.error(f"❌ 분할 매수 데이터 저장 실패: {str(e)}")
@@ -473,17 +506,30 @@ def add_stock_callback():
                 "Symbol": symbol_normalized,
                 "Name": name,
                 "InterestDate": interest_date.strftime("%Y-%m-%d") if interest_date else "",
-                "Note": note if note else ""
+                "Note": note if note else "",
+                "MarketCap": "",
+                "Installments": "",
+                "BuyTransactions": "[]",
+                "SellTransactions": "[]"
             }
-            # BuyDate1~10, SellDate1~10 초기화
-            for i in range(1, 11):
-                new_row[f"BuyDate{i}"] = ""
-                new_row[f"SellDate{i}"] = ""
-            # 첫 번째 매수일/매도일 설정
+            # 첫 번째 매수일/매도일이 있으면 BuyTransactions, SellTransactions에 추가
+            buy_txs = []
+            sell_txs = []
             if buy_date:
-                new_row["BuyDate1"] = buy_date.strftime("%Y-%m-%d")
+                buy_txs.append({
+                    "date": buy_date.strftime("%Y-%m-%d"),
+                    "price": 0,
+                    "quantity": 0
+                })
             if sell_date:
-                new_row["SellDate1"] = sell_date.strftime("%Y-%m-%d")
+                sell_txs.append({
+                    "date": sell_date.strftime("%Y-%m-%d"),
+                    "price": 0,
+                    "quantity": 0
+                })
+            new_row["BuyTransactions"] = json.dumps(buy_txs) if buy_txs else "[]"
+            new_row["SellTransactions"] = json.dumps(sell_txs) if sell_txs else "[]"
+            
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_stocks(df)
             
@@ -581,30 +627,38 @@ with tab1:
             # 종목 선택
             stock_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df.iterrows()]
             
-            # 카테고리 필터링
+            # 카테고리 필터링 (BuyTransactions 사용)
             if category == "매수종목":
                 filtered_options = []
                 for idx, row in df.iterrows():
-                    # BuyDate1~10 중 하나라도 있으면 매수종목
-                    has_buy_date = False
-                    for i in range(1, 11):
-                        if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
-                            has_buy_date = True
-                            break
-                    if has_buy_date:
+                    # BuyTransactions에 데이터가 있으면 매수종목
+                    buy_txs_str = row.get('BuyTransactions', '[]')
+                    has_buy = False
+                    try:
+                        if pd.notna(buy_txs_str) and str(buy_txs_str).strip():
+                            buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                            if buy_txs and len(buy_txs) > 0:
+                                has_buy = True
+                    except:
+                        pass
+                    if has_buy:
                         filtered_options.append(f"{row['Name']} ({row['Symbol']})")
                 if filtered_options:
                     stock_options = filtered_options
             elif category == "관심종목":
                 filtered_options = []
                 for idx, row in df.iterrows():
-                    # BuyDate1~10이 모두 비어있고 InterestDate가 있으면 관심종목
-                    has_buy_date = False
-                    for i in range(1, 11):
-                        if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
-                            has_buy_date = True
-                            break
-                    if not has_buy_date and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
+                    # BuyTransactions가 비어있고 InterestDate가 있으면 관심종목
+                    buy_txs_str = row.get('BuyTransactions', '[]')
+                    has_buy = False
+                    try:
+                        if pd.notna(buy_txs_str) and str(buy_txs_str).strip():
+                            buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                            if buy_txs and len(buy_txs) > 0:
+                                has_buy = True
+                    except:
+                        pass
+                    if not has_buy and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
                         filtered_options.append(f"{row['Name']} ({row['Symbol']})")
                 if filtered_options:
                     stock_options = filtered_options
@@ -661,20 +715,22 @@ with tab1:
                 interest_date = selected_row.get('InterestDate', '')
                 note = selected_row.get('Note', '')
                 
-                # BuyDate1~10, SellDate1~10 읽기
-                buy_dates = []
-                sell_dates = []
-                for i in range(1, 11):
-                    buy_date_val = selected_row.get(f'BuyDate{i}', '')
-                    if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
-                        buy_dates.append(str(buy_date_val).strip())
-                    else:
-                        buy_dates.append("")
-                    sell_date_val = selected_row.get(f'SellDate{i}', '')
-                    if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
-                        sell_dates.append(str(sell_date_val).strip())
-                    else:
-                        sell_dates.append("")
+                # BuyTransactions, SellTransactions 읽기 (JSON 파싱)
+                buy_transactions = []
+                sell_transactions = []
+                try:
+                    buy_txs_str = selected_row.get('BuyTransactions', '[]')
+                    if pd.notna(buy_txs_str) and str(buy_txs_str).strip():
+                        buy_transactions = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                except:
+                    buy_transactions = []
+                
+                try:
+                    sell_txs_str = selected_row.get('SellTransactions', '[]')
+                    if pd.notna(sell_txs_str) and str(sell_txs_str).strip():
+                        sell_transactions = json.loads(sell_txs_str) if isinstance(sell_txs_str, str) else sell_txs_str
+                except:
+                    sell_transactions = []
                 
                 # 정보 수정하기 (상단 컨트롤 바 아래 별도 영역)
                 with st.container():
@@ -747,10 +803,10 @@ with tab1:
                             key=f"edit_interest_date_{symbol}"
                         )
                         
-                        # 매수일 입력 (동적 추가)
+                        # 매수일 입력 (BuyTransactions 사용)
                         st.write("**매수일**")
                         buy_date_inputs = []
-                        buy_date_count = len([d for d in buy_dates if d != ""]) or 1
+                        buy_date_count = len(buy_transactions) if buy_transactions else 1
                         if buy_date_count == 0:
                             buy_date_count = 1
                         
@@ -761,35 +817,31 @@ with tab1:
                         for i in range(st.session_state[f'buy_date_count_{symbol}']):
                             col_date, col_delete = st.columns([4, 1])
                             with col_date:
+                                tx = buy_transactions[i] if i < len(buy_transactions) else {}
+                                tx_date = tx.get('date', '') if isinstance(tx, dict) else ''
                                 buy_date_inputs.append(st.date_input(
                                     f"매수일 {i+1}",
-                                    value=parse_date(buy_dates[i]) if i < len(buy_dates) else None,
+                                    value=parse_date(tx_date) if tx_date else None,
                                     key=f"edit_buy_date_{i}_{symbol}",
                                     label_visibility="collapsed"
                                 ))
                             with col_delete:
                                 if st.button("🗑️", key=f"delete_buy_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                    # 즉시 CSV에서 해당 날짜 삭제
+                                    # BuyTransactions에서 해당 항목 삭제
                                     df_stocks = load_stocks()
                                     mask = df_stocks['Symbol'] == symbol
                                     if mask.any():
-                                        # i는 0부터 시작하므로 BuyDate{i+1}에 해당
-                                        date_idx = i + 1
-                                        # 해당 인덱스의 BuyDate를 None으로 명시적 할당
-                                        df_stocks.loc[mask, f'BuyDate{date_idx}'] = None
-                                        # 뒤의 날짜들을 앞으로 이동
-                                        for j in range(date_idx, 10):
-                                            next_val = df_stocks.loc[mask, f'BuyDate{j+1}'].values[0] if mask.any() else None
-                                            if pd.notna(next_val) and str(next_val).strip() != "":
-                                                df_stocks.loc[mask, f'BuyDate{j}'] = str(next_val).strip()
-                                            else:
-                                                df_stocks.loc[mask, f'BuyDate{j}'] = ""
-                                        df_stocks.loc[mask, 'BuyDate10'] = ""
-                                        # 즉시 저장
-                                        save_stocks(df_stocks)
-                                        st.success("삭제되었습니다!")
-                                        # 0.5초 대기
-                                        time.sleep(0.5)
+                                        try:
+                                            buy_txs_str = df_stocks.loc[mask, 'BuyTransactions'].values[0]
+                                            buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                                            if i < len(buy_txs):
+                                                buy_txs.pop(i)
+                                            df_stocks.loc[mask, 'BuyTransactions'] = json.dumps(buy_txs)
+                                            save_stocks(df_stocks)
+                                            st.success("삭제되었습니다!")
+                                            time.sleep(0.5)
+                                        except:
+                                            pass
                                     # 개수 조정
                                     if st.session_state[f'buy_date_count_{symbol}'] > 0:
                                         st.session_state[f'buy_date_count_{symbol}'] -= 1
@@ -805,10 +857,10 @@ with tab1:
                             else:
                                 st.warning("최대 10개까지 추가 가능합니다.")
                         
-                        # 매도일 입력 (동적 추가)
+                        # 매도일 입력 (SellTransactions 사용)
                         st.write("**매도일**")
                         sell_date_inputs = []
-                        sell_date_count = len([d for d in sell_dates if d != ""]) or 1
+                        sell_date_count = len(sell_transactions) if sell_transactions else 1
                         if sell_date_count == 0:
                             sell_date_count = 1
                         
@@ -819,35 +871,31 @@ with tab1:
                         for i in range(st.session_state[f'sell_date_count_{symbol}']):
                             col_date, col_delete = st.columns([4, 1])
                             with col_date:
+                                tx = sell_transactions[i] if i < len(sell_transactions) else {}
+                                tx_date = tx.get('date', '') if isinstance(tx, dict) else ''
                                 sell_date_inputs.append(st.date_input(
                                     f"매도일 {i+1}",
-                                    value=parse_date(sell_dates[i]) if i < len(sell_dates) else None,
+                                    value=parse_date(tx_date) if tx_date else None,
                                     key=f"edit_sell_date_{i}_{symbol}",
                                     label_visibility="collapsed"
                                 ))
                             with col_delete:
                                 if st.button("🗑️", key=f"delete_sell_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                    # 즉시 CSV에서 해당 날짜 삭제
+                                    # SellTransactions에서 해당 항목 삭제
                                     df_stocks = load_stocks()
                                     mask = df_stocks['Symbol'] == symbol
                                     if mask.any():
-                                        # i는 0부터 시작하므로 SellDate{i+1}에 해당
-                                        date_idx = i + 1
-                                        # 해당 인덱스의 SellDate를 None으로 명시적 할당
-                                        df_stocks.loc[mask, f'SellDate{date_idx}'] = None
-                                        # 뒤의 날짜들을 앞으로 이동
-                                        for j in range(date_idx, 10):
-                                            next_val = df_stocks.loc[mask, f'SellDate{j+1}'].values[0] if mask.any() else None
-                                            if pd.notna(next_val) and str(next_val).strip() != "":
-                                                df_stocks.loc[mask, f'SellDate{j}'] = str(next_val).strip()
-                                            else:
-                                                df_stocks.loc[mask, f'SellDate{j}'] = ""
-                                        df_stocks.loc[mask, 'SellDate10'] = ""
-                                        # 즉시 저장
-                                        save_stocks(df_stocks)
-                                        st.success("삭제되었습니다!")
-                                        # 0.5초 대기
-                                        time.sleep(0.5)
+                                        try:
+                                            sell_txs_str = df_stocks.loc[mask, 'SellTransactions'].values[0]
+                                            sell_txs = json.loads(sell_txs_str) if isinstance(sell_txs_str, str) else sell_txs_str
+                                            if i < len(sell_txs):
+                                                sell_txs.pop(i)
+                                            df_stocks.loc[mask, 'SellTransactions'] = json.dumps(sell_txs)
+                                            save_stocks(df_stocks)
+                                            st.success("삭제되었습니다!")
+                                            time.sleep(0.5)
+                                        except:
+                                            pass
                                     # 개수 조정
                                     if st.session_state[f'sell_date_count_{symbol}'] > 0:
                                         st.session_state[f'sell_date_count_{symbol}'] -= 1
@@ -877,20 +925,29 @@ with tab1:
                             mask = df_stocks['Symbol'] == symbol
                             if mask.any():
                                 df_stocks.loc[mask, 'InterestDate'] = edit_interest_date.strftime("%Y-%m-%d") if edit_interest_date else ""
-                                # BuyDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
-                                buy_dates_to_save = [d for d in buy_date_inputs if d is not None]
-                                for i in range(1, 11):
-                                    if i <= len(buy_dates_to_save):
-                                        df_stocks.loc[mask, f'BuyDate{i}'] = buy_dates_to_save[i-1].strftime("%Y-%m-%d")
-                                    else:
-                                        df_stocks.loc[mask, f'BuyDate{i}'] = ""
-                                # SellDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
-                                sell_dates_to_save = [d for d in sell_date_inputs if d is not None]
-                                for i in range(1, 11):
-                                    if i <= len(sell_dates_to_save):
-                                        df_stocks.loc[mask, f'SellDate{i}'] = sell_dates_to_save[i-1].strftime("%Y-%m-%d")
-                                    else:
-                                        df_stocks.loc[mask, f'SellDate{i}'] = ""
+                                
+                                # BuyTransactions 저장 (날짜만 있는 경우 기본값으로 저장)
+                                buy_txs_to_save = []
+                                for d in buy_date_inputs:
+                                    if d is not None:
+                                        buy_txs_to_save.append({
+                                            "date": d.strftime("%Y-%m-%d"),
+                                            "price": 0,
+                                            "quantity": 0
+                                        })
+                                df_stocks.loc[mask, 'BuyTransactions'] = json.dumps(buy_txs_to_save) if buy_txs_to_save else "[]"
+                                
+                                # SellTransactions 저장 (날짜만 있는 경우 기본값으로 저장)
+                                sell_txs_to_save = []
+                                for d in sell_date_inputs:
+                                    if d is not None:
+                                        sell_txs_to_save.append({
+                                            "date": d.strftime("%Y-%m-%d"),
+                                            "price": 0,
+                                            "quantity": 0
+                                        })
+                                df_stocks.loc[mask, 'SellTransactions'] = json.dumps(sell_txs_to_save) if sell_txs_to_save else "[]"
+                                
                                 df_stocks.loc[mask, 'Note'] = edit_note if edit_note else ""
                                 save_stocks(df_stocks)
                                 st.success("수정되었습니다!")
@@ -1034,22 +1091,32 @@ with tab1:
                         except Exception as e:
                             pass
                     
-                    # 매수일 표시 (네온 빨간색 화살표 - 위 방향) - 여러 개 표시
-                    for i in range(1, 11):
-                        buy_date_val = selected_row.get(f'BuyDate{i}', '')
-                        if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
+                    # 매수일 표시 (네온 빨간색 화살표 - 위 방향) - BuyTransactions에서 날짜 추출
+                    for idx, tx in enumerate(buy_transactions):
+                        if isinstance(tx, dict):
+                            buy_date_val = tx.get('date', '')
+                        else:
+                            buy_date_val = str(tx) if tx else ''
+                        
+                        if buy_date_val and str(buy_date_val).strip() != "":
                             buy_dt = parse_date_safe(buy_date_val)
                             if buy_dt is not None:
                                 try:
                                     if len(stock_data.index) > 0:
                                         trading_date = find_trading_date(buy_dt, stock_data.index)
                                         if trading_date is not None and trading_date in stock_data.index:
-                                            price = stock_data.loc[trading_date, 'Low']
+                                            # 가격 정보가 있으면 사용, 없으면 Low 가격 사용
+                                            tx_price = tx.get('price', 0) if isinstance(tx, dict) else 0
+                                            if tx_price and tx_price > 0:
+                                                price = tx_price
+                                            else:
+                                                price = stock_data.loc[trading_date, 'Low']
+                                            
                                             # 가격 범위 계산 (텍스트 위치)
                                             price_range = stock_data['High'].max() - stock_data['Low'].min()
                                             offset = price_range * 0.01  # 가격 범위의 1%만큼 아래로
                                             text_y = price - offset  # 텍스트 위치
-                                            text_label = "🔴 매수" if i == 1 else f"🔴 매수{i}"
+                                            text_label = "🔴 매수" if idx == 0 else f"🔴 매수{idx+1}"
                                             annotations.append(dict(
                                                 x=trading_date,
                                                 y=text_y,  # 텍스트는 아래에
@@ -1071,24 +1138,34 @@ with tab1:
                                 except Exception as e:
                                     pass
                     
-                    # 매도일 표시 (네온 하늘색 화살표 - 아래 방향) - 여러 개 표시
-                    for i in range(1, 11):
-                        sell_date_val = selected_row.get(f'SellDate{i}', '')
-                        if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
+                    # 매도일 표시 (네온 하늘색 화살표 - 아래 방향) - SellTransactions에서 날짜 추출
+                    for idx, tx in enumerate(sell_transactions):
+                        if isinstance(tx, dict):
+                            sell_date_val = tx.get('date', '')
+                        else:
+                            sell_date_val = str(tx) if tx else ''
+                        
+                        if sell_date_val and str(sell_date_val).strip() != "":
                             sell_dt = parse_date_safe(sell_date_val)
                             if sell_dt is not None:
                                 try:
                                     if len(stock_data.index) > 0:
                                         trading_date = find_trading_date(sell_dt, stock_data.index)
                                         if trading_date is not None and trading_date in stock_data.index:
-                                            price = stock_data.loc[trading_date, 'High']
+                                            # 가격 정보가 있으면 사용, 없으면 High 가격 사용
+                                            tx_price = tx.get('price', 0) if isinstance(tx, dict) else 0
+                                            if tx_price and tx_price > 0:
+                                                price = tx_price
+                                            else:
+                                                price = stock_data.loc[trading_date, 'High']
+                                            
                                             # 가격 범위 계산 (텍스트 위치)
                                             price_range = stock_data['High'].max() - stock_data['Low'].min()
                                             offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
                                             text_y = price + offset  # 텍스트 위치
                                             sell_dates.append(trading_date)
                                             sell_prices.append(price)
-                                            text_label = "🔵 매도" if i == 1 else f"🔵 매도{i}"
+                                            text_label = "🔵 매도" if idx == 0 else f"🔵 매도{idx+1}"
                                             annotations.append(dict(
                                                 x=trading_date,
                                                 y=text_y,  # 텍스트는 위에
