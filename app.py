@@ -1628,435 +1628,134 @@ with tab2:
         if portfolio_data:
             st.markdown("### 종목별 현황")
             
-            # 뱃지들을 그리드로 표시
+            # 뱃지들을 그리드로 표시 (순수 Streamlit 버튼 사용)
             sorted_stocks = sorted(portfolio_data, key=lambda x: x['totalInvested'], reverse=True)
-            num_cols = min(9, len(sorted_stocks))
             
-            # 모든 뱃지 스타일을 한 번에 정의
-            light_green = "#86efac"  # 연한 초록색
-            dark_green = "#10b981"    # 진한 초록색
-            
-            # HTML 버튼으로 뱃지 생성 (모든 종목을 한 번에, 중복 없이)
-            badges_html = '<div style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem;">'
-            
-            # 중복 방지를 위한 set
+            # 중복 방지
             added_stock_ids = set()
-            
-            for idx, stock_data in enumerate(sorted_stocks):
-                name = stock_data['name']
-                progress = stock_data['progress']
+            unique_stocks = []
+            for stock_data in sorted_stocks:
                 stock_id = stock_data['id']
-                
-                # 중복 체크
-                if stock_id in added_stock_ids:
-                    continue
-                added_stock_ids.add(stock_id)
-                
-                progress_pct = min(100, max(0, progress))
-                
-                # 그라데이션을 더 명확하게 적용 (한 줄로 만들기)
-                # 진행률이 0%면 전체 연한 초록, 100%면 전체 진한 초록
-                badges_html += f'<button id="badge_btn_{stock_id}" class="stock-badge-btn" data-stock-id="{stock_id}" data-progress="{progress_pct}" style="background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%); border: 2px solid {dark_green}; border-radius: 12px; padding: 0.8rem 1.5rem; color: #ffffff; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: Pretendard, sans-serif; min-width: 120px;">{name}</button>'
+                if stock_id not in added_stock_ids:
+                    added_stock_ids.add(stock_id)
+                    unique_stocks.append(stock_data)
             
-            badges_html += '</div>'
-            
-            # CSS 스타일 추가 (호버 효과 포함)
-            st.markdown("""
-            <style>
-            .stock-badge-btn, [id^="badge_btn_"] {
-                transition: all 0.3s ease !important;
-            }
-            .stock-badge-btn:hover, [id^="badge_btn_"]:hover {
-                transform: scale(1.05) !important;
-                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # HTML 렌더링 (한 번에)
-            try:
-                st.markdown(badges_html, unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"HTML 렌더링 오류: {e}")
-                # 대체 방법: Streamlit 버튼 사용
-                badge_cols = st.columns(min(9, len(sorted_stocks)))
-                for idx, stock_data in enumerate(sorted_stocks):
+            # 그리드 레이아웃
+            num_cols = min(9, len(unique_stocks))
+            if num_cols > 0:
+                # 첫 번째 줄
+                badge_cols = st.columns(num_cols)
+                for idx, stock_data in enumerate(unique_stocks[:num_cols]):
                     name = stock_data['name']
+                    progress = stock_data['progress']
                     stock_id = stock_data['id']
-                    col_idx = idx % len(badge_cols)
-                    with badge_cols[col_idx]:
-                        if st.button(name, key=f"badge_{stock_id}", use_container_width=True):
+                    progress_pct = min(100, max(0, progress))
+                    
+                    with badge_cols[idx]:
+                        if st.button(
+                            name,
+                            key=f"badge_{stock_id}",
+                            use_container_width=True,
+                            help=f"매수 진행률: {progress_pct:.1f}%"
+                        ):
                             st.session_state[f"expand_{stock_id}"] = True
                             st.session_state[f"scroll_to_{stock_id}"] = True
                             st.rerun()
-            
-            # JavaScript로 강제 스타일 적용 (더 강력한 버전)
-            js_apply_styles = f"""
-            <script>
-            console.log('뱃지 스타일 스크립트 시작');
-            
-            function applyBadgeStyles() {{
-                const darkGreen = '{dark_green}';
-                const lightGreen = '{light_green}';
                 
-                // 여러 선택자로 뱃지 찾기
-                const selectors = [
-                    '.stock-badge-btn',
-                    '[id^="badge_btn_"]',
-                    'button[id*="badge"]',
-                    'button[data-progress]'
-                ];
+                # 나머지 줄들
+                remaining = unique_stocks[num_cols:]
+                row_num = 0
+                while remaining:
+                    row_stocks = remaining[:num_cols]
+                    remaining = remaining[num_cols:]
+                    if row_stocks:
+                        row_cols = st.columns(num_cols)
+                        for col_idx, stock_data in enumerate(row_stocks):
+                            name = stock_data['name']
+                            progress = stock_data['progress']
+                            stock_id = stock_data['id']
+                            progress_pct = min(100, max(0, progress))
+                            
+                            with row_cols[col_idx]:
+                                if st.button(
+                                    name,
+                                    key=f"badge_{stock_id}_r{row_num}",
+                                    use_container_width=True,
+                                    help=f"매수 진행률: {progress_pct:.1f}%"
+                                ):
+                                    st.session_state[f"expand_{stock_id}"] = True
+                                    st.session_state[f"scroll_to_{stock_id}"] = True
+                                    st.rerun()
+                        row_num += 1
+            
+            # 뱃지 버튼 스타일링 (CSS + JavaScript로 진행률 적용)
+            if unique_stocks:
+                # 진행률 데이터 준비
+                progress_map = {stock['id']: min(100, max(0, stock['progress'])) for stock in unique_stocks}
                 
-                let allBadges = [];
-                selectors.forEach(sel => {{
-                    try {{
-                        const badges = document.querySelectorAll(sel);
-                        badges.forEach(b => {{
-                            if (!allBadges.includes(b)) allBadges.push(b);
-                        }});
-                    }} catch(e) {{
-                        console.log('선택자 오류:', sel, e);
-                    }}
-                }});
-                
-                console.log('뱃지 버튼 찾음:', allBadges.length);
-                
-                allBadges.forEach(btn => {{
-                    const progress = parseFloat(btn.getAttribute('data-progress')) || 0;
-                    const progressPct = Math.min(100, Math.max(0, progress));
-                    
-                    // 직접 스타일 적용
-                    const gradient = `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progressPct}}%, ${{lightGreen}} ${{progressPct}}%, ${{lightGreen}} 100%)`;
-                    
-                    // cssText로 강제 적용
-                    const existingStyle = btn.style.cssText || '';
-                    btn.style.cssText = existingStyle + `
-                        background: ${{gradient}} !important;
-                        background-image: ${{gradient}} !important;
-                        border: 2px solid ${{darkGreen}} !important;
-                        border-radius: 12px !important;
-                        color: #ffffff !important;
-                        font-weight: 600 !important;
-                    `;
-                    
-                    // 추가로 setProperty도 사용
-                    btn.style.setProperty('background', gradient, 'important');
-                    btn.style.setProperty('background-image', gradient, 'important');
-                    
-                    console.log('뱃지 스타일 적용:', btn.id || btn.className, '진행률:', progressPct + '%');
-                }});
-            }}
-            
-            // 즉시 실행
-            if (document.readyState === 'loading') {{
-                document.addEventListener('DOMContentLoaded', applyBadgeStyles);
-            }} else {{
-                applyBadgeStyles();
-            }}
-            
-            // 여러 번 시도
-            setTimeout(applyBadgeStyles, 100);
-            setTimeout(applyBadgeStyles, 500);
-            setTimeout(applyBadgeStyles, 1000);
-            setTimeout(applyBadgeStyles, 2000);
-            setTimeout(applyBadgeStyles, 3000);
-            
-            // MutationObserver로 DOM 변경 감지
-            try {{
-                const observer = new MutationObserver(function(mutations) {{
-                    applyBadgeStyles();
-                }});
-                
-                observer.observe(document.body, {{
-                    childList: true,
-                    subtree: true,
-                    attributes: true
-                }});
-            }} catch(e) {{
-                console.log('MutationObserver 오류:', e);
-            }}
-            
-            // 호버 효과 및 클릭 이벤트 추가
-            function setupBadgeEvents() {{
-                const badges = document.querySelectorAll('.stock-badge-btn, [id^="badge_btn_"]');
-                
-                badges.forEach(btn => {{
-                    const stockId = btn.getAttribute('data-stock-id') || btn.id.replace('badge_btn_', '').replace('_2', '');
-                    
-                    // 호버 효과
-                    btn.addEventListener('mouseenter', function() {{
-                        this.style.transform = 'scale(1.05)';
-                        this.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.2)';
-                    }});
-                    
-                    btn.addEventListener('mouseleave', function() {{
-                        this.style.transform = 'scale(1)';
-                        this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-                    }});
-                    
-                    // 클릭 이벤트
-                    btn.addEventListener('click', function(e) {{
-                        e.preventDefault();
-                        handleBadgeClick(stockId);
-                    }});
-                }});
-            }}
-            
-            // 이벤트 설정
-            setTimeout(setupBadgeEvents, 100);
-            setTimeout(setupBadgeEvents, 500);
-            setTimeout(setupBadgeEvents, 1000);
-            
-            // 숨겨진 Streamlit 버튼 완전히 제거
-            function hideBadgeClickButtons() {{
-                // 모든 badge_click 버튼 찾기
-                const hiddenButtons = document.querySelectorAll('button[key^="badge_click_"], button[key*="badge_click"]');
-                hiddenButtons.forEach(btn => {{
-                    btn.style.display = 'none';
-                    btn.style.visibility = 'hidden';
-                    btn.style.opacity = '0';
-                    btn.style.width = '0';
-                    btn.style.height = '0';
-                    btn.style.padding = '0';
-                    btn.style.margin = '0';
-                    btn.style.position = 'absolute';
-                    btn.style.left = '-9999px';
-                    btn.style.pointerEvents = 'none';
-                    btn.style.fontSize = '0';
-                    btn.style.lineHeight = '0';
-                    btn.style.border = 'none';
-                    btn.style.background = 'transparent';
-                    
-                    // 부모 컨테이너도 숨기기
-                    const parent = btn.closest('div[data-testid="stButton"]');
-                    if (parent) {{
-                        parent.style.display = 'none';
-                        parent.style.visibility = 'hidden';
-                        parent.style.height = '0';
-                        parent.style.margin = '0';
-                        parent.style.padding = '0';
-                        parent.style.overflow = 'hidden';
-                    }}
-                    
-                    // 더 상위 컨테이너도 숨기기
-                    const container = btn.closest('div[data-testid="stContainer"]');
-                    if (container) {{
-                        // 컨테이너 내부에 다른 버튼이 있는지 확인
-                        const otherButtons = container.querySelectorAll('button:not([key^="badge_click_"]):not([key*="badge_click"])');
-                        if (otherButtons.length === 0) {{
-                            // 다른 버튼이 없으면 컨테이너 전체 숨기기
-                            container.style.display = 'none';
-                            container.style.visibility = 'hidden';
-                            container.style.height = '0';
-                            container.style.margin = '0';
-                            container.style.padding = '0';
-                            container.style.overflow = 'hidden';
-                        }}
-                    }}
-                }});
-                
-                // 추가: 모든 stContainer 중 badge_click 버튼만 있는 컨테이너 찾아서 숨기기
-                const containers = document.querySelectorAll('div[data-testid="stContainer"]');
-                containers.forEach(container => {{
-                    const badgeButtons = container.querySelectorAll('button[key^="badge_click_"], button[key*="badge_click"]');
-                    const otherButtons = container.querySelectorAll('button:not([key^="badge_click_"]):not([key*="badge_click"])');
-                    if (badgeButtons.length > 0 && otherButtons.length === 0) {{
-                        container.style.display = 'none';
-                        container.style.visibility = 'hidden';
-                        container.style.height = '0';
-                        container.style.margin = '0';
-                        container.style.padding = '0';
-                        container.style.overflow = 'hidden';
-                    }}
-                }});
-            }}
-            
-            // 여러 번 실행
-            hideBadgeClickButtons();
-            setTimeout(hideBadgeClickButtons, 100);
-            setTimeout(hideBadgeClickButtons, 500);
-            setTimeout(hideBadgeClickButtons, 1000);
-            
-            // MutationObserver로 계속 감시
-            const hideObserver = new MutationObserver(function(mutations) {{
-                hideBadgeClickButtons();
-            }});
-            
-            try {{
-                hideObserver.observe(document.body, {{
-                    childList: true,
-                    subtree: true,
-                    attributes: true
-                }});
-            }} catch(e) {{
-                console.log('Hide observer 오류:', e);
-            }}
-            
-            console.log('뱃지 스타일 스크립트 로드 완료');
-            </script>
-            """
-            st.markdown(js_apply_styles, unsafe_allow_html=True)
-            
-            
-            # JavaScript로 클릭 이벤트 처리
-            st.markdown("""
-            <script>
-            function handleBadgeClick(stockId) {
-                console.log('뱃지 클릭:', stockId);
-                
-                // 현재 문서에서 Streamlit 버튼 찾기
-                const buttons = document.querySelectorAll('button[data-testid*="baseButton"]');
-                let clicked = false;
-                
-                buttons.forEach(btn => {
-                    const key = btn.getAttribute('key');
-                    if (key && key === 'badge_click_' + stockId) {
-                        console.log('Streamlit 버튼 찾음:', key);
-                        btn.click();
-                        clicked = true;
-                    }
-                });
-                
-                if (!clicked) {
-                    console.log('Streamlit 버튼을 찾지 못함, 직접 expander 열기 시도');
-                    // 직접 expander 찾아서 열기
-                    setTimeout(function() {
-                        const expanders = document.querySelectorAll('[data-testid="stExpander"]');
-                        expanders.forEach(expander => {
-                            const summary = expander.querySelector('summary');
-                            if (summary) {
-                                const text = summary.textContent || '';
-                                // 종목명으로 찾기
-                                if (text.includes(stockId) || text.includes('📊')) {
-                                    if (!expander.hasAttribute('open')) {
-                                        summary.click();
-                                    }
-                                    expander.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }
-                            }
-                        });
-                    }, 200);
-                }
-            }
-            
-            // 페이지 로드 후 뱃지 버튼 확인
-            setTimeout(function() {
-                const badgeButtons = document.querySelectorAll('[id^="badge_btn_"]');
-                console.log('뱃지 버튼 개수:', badgeButtons.length);
-                
-                badgeButtons.forEach(btn => {
-                    console.log('뱃지 버튼 ID:', btn.id, '스타일:', btn.style.background);
-                    // 클릭 이벤트가 이미 onclick에 있으므로 추가 리스너는 필요 없음
-                });
-            }, 1000);
-            </script>
-            """, unsafe_allow_html=True)
-            
-            # 숨겨진 버튼 스타일 (먼저 적용 - 더 강력하게)
-            st.markdown("""
-            <style>
-            /* 숨겨진 버튼 완전히 제거 - 모든 가능한 선택자 사용 */
-            button[key^="badge_click_"],
-            button[key*="badge_click"],
-            button[data-testid*="baseButton"][key^="badge_click_"],
-            div[data-testid="stButton"] button[key^="badge_click_"],
-            div[data-testid="stButton"] button[key*="badge_click"],
-            div:has(button[key^="badge_click_"]),
-            div:has(button[key*="badge_click"]),
-            section:has(button[key^="badge_click_"]) {
-                display: none !important;
-                visibility: hidden !important;
-                opacity: 0 !important;
-                width: 0 !important;
-                height: 0 !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                position: absolute !important;
-                left: -9999px !important;
-                overflow: hidden !important;
-                pointer-events: none !important;
-                border: none !important;
-                background: transparent !important;
-                font-size: 0 !important;
-                line-height: 0 !important;
-            }
-            /* Streamlit 버튼 컨테이너도 숨기기 */
-            div[data-testid="stButton"]:has(button[key^="badge_click_"]),
-            div[data-testid="stButton"]:has(button[key*="badge_click"]),
-            div.stButton:has(button[key^="badge_click_"]) {
-                display: none !important;
-                visibility: hidden !important;
-                height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                overflow: hidden !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # Streamlit 버튼으로 클릭 이벤트 처리 (완전히 숨김)
-            # 각 종목당 버튼을 한 번만 생성 (중복 방지)
-            # 컨테이너를 숨기기 위해 CSS 적용
-            st.markdown("""
-            <style>
-            /* 숨겨진 버튼 컨테이너도 완전히 숨기기 - 더 강력한 선택자 */
-            div[data-testid="stContainer"]:has(button[key^="badge_click_"]),
-            div[data-testid="stContainer"]:has(button[key*="badge_click"]),
-            div[data-testid="stContainer"] > div:has(button[key^="badge_click_"]),
-            div[data-testid="stContainer"] > div:has(button[key*="badge_click"]),
-            /* 모든 컨테이너 내부의 badge_click 버튼 찾기 */
-            div[data-testid="stContainer"] button[key^="badge_click_"],
-            div[data-testid="stContainer"] button[key*="badge_click"] {
-                display: none !important;
-                visibility: hidden !important;
-                height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                overflow: hidden !important;
-                opacity: 0 !important;
-                width: 0 !important;
-                position: absolute !important;
-                left: -9999px !important;
-            }
-            /* 컨테이너 자체도 숨기기 */
-            div[data-testid="stContainer"]:has(> div > button[key^="badge_click_"]),
-            div[data-testid="stContainer"]:has(> div > button[key*="badge_click"]) {
-                display: none !important;
-                visibility: hidden !important;
-                height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                overflow: hidden !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # 숨겨진 컨테이너에 버튼 생성 (완전히 숨김)
-            with st.container():
-                st.markdown("""
+                st.markdown(f"""
                 <style>
-                /* 이 컨테이너 자체를 숨기기 */
-                div[data-testid="stContainer"]:has(button[key^="badge_click_"]) {
-                    display: none !important;
-                    visibility: hidden !important;
-                    height: 0 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    overflow: hidden !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                /* 뱃지 버튼 기본 스타일 */
+                div[data-testid="stButton"] button[key^="badge_"] {{
+                    border: 2px solid #10b981 !important;
+                    border-radius: 12px !important;
+                    color: #ffffff !important;
+                    font-weight: 600 !important;
+                    font-size: 0.95rem !important;
+                    padding: 0.8rem 1.5rem !important;
+                    transition: all 0.3s ease !important;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+                    font-family: 'Pretendard', sans-serif !important;
+                    min-height: 48px !important;
+                }}
                 
-                # 모든 종목에 대해 버튼 생성 (중복 없이)
-                created_stock_ids = set()
-                for stock_data in sorted_stocks:
-                    stock_id = stock_data['id']
-                    if stock_id not in created_stock_ids:
-                        created_stock_ids.add(stock_id)
-                        if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
-                            st.session_state[f"expand_{stock_id}"] = True
-                            st.session_state[f"scroll_to_{stock_id}"] = True
-                            st.rerun()
+                div[data-testid="stButton"] button[key^="badge_"]:hover {{
+                    transform: scale(1.05) !important;
+                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
+                }}
+                </style>
+                
+                <script>
+                (function() {{
+                    const progressMap = {json.dumps(progress_map)};
+                    const darkGreen = '#10b981';
+                    const lightGreen = '#86efac';
+                    
+                    function applyGradients() {{
+                        document.querySelectorAll('button[key^="badge_"]').forEach(btn => {{
+                            const key = btn.getAttribute('key');
+                            if (!key) return;
+                            
+                            // key에서 stock_id 추출
+                            let stockId = null;
+                            for (const [id, progress] of Object.entries(progressMap)) {{
+                                if (key.includes(id) || key.includes('badge_' + id)) {{
+                                    stockId = id;
+                                    break;
+                                }}
+                            }}
+                            
+                            if (stockId && progressMap[stockId] !== undefined) {{
+                                const progress = progressMap[stockId];
+                                const gradient = `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progress}}%, ${{lightGreen}} ${{progress}}%, ${{lightGreen}} 100%)`;
+                                btn.style.background = gradient;
+                                btn.style.backgroundImage = gradient;
+                            }}
+                        }});
+                    }}
+                    
+                    applyGradients();
+                    if (document.readyState === 'loading') {{
+                        document.addEventListener('DOMContentLoaded', applyGradients);
+                    }}
+                    setTimeout(applyGradients, 100);
+                    setTimeout(applyGradients, 500);
+                    
+                    const observer = new MutationObserver(applyGradients);
+                    observer.observe(document.body, {{ childList: true, subtree: true }});
+                }})();
+                </script>
+                """, unsafe_allow_html=True)
             
         
         # 전체 현황판 (드롭다운 기능 포함)
