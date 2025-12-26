@@ -1321,7 +1321,8 @@ with tab2:
                 col5.metric("분할 횟수", f"{installments}회")
                 
                 # 진행률
-                st.progress(progress / 100)
+                progress_value = max(0.0, min(1.0, progress / 100))
+                st.progress(progress_value)
                 col_prog1, col_prog2 = st.columns(2)
                 col_prog1.write(f"**매수 진행률: {progress:.2f}%**")
                 col_prog2.write(f"**총 실현손익: {total_realized_profit:,.0f}원**")
