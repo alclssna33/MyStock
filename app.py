@@ -1681,52 +1681,93 @@ with tab2:
             badges_html += '</div>'
             st.markdown(badges_html, unsafe_allow_html=True)
             
-            # JavaScript로 강제 스타일 적용 (페이지 로드 후 실행)
+            # JavaScript로 강제 스타일 적용 (더 강력한 버전)
             js_apply_styles = f"""
             <script>
-            (function() {{
+            console.log('뱃지 스타일 스크립트 시작');
+            
+            function applyBadgeStyles() {{
                 const darkGreen = '{dark_green}';
                 const lightGreen = '{light_green}';
                 
-                function applyBadgeStyles() {{
-                    const badges = document.querySelectorAll('.stock-badge-btn, [id^="badge_btn_"]');
-                    console.log('뱃지 버튼 찾음:', badges.length);
+                // 여러 선택자로 뱃지 찾기
+                const selectors = [
+                    '.stock-badge-btn',
+                    '[id^="badge_btn_"]',
+                    'button[id*="badge"]',
+                    'button[data-progress]'
+                ];
+                
+                let allBadges = [];
+                selectors.forEach(sel => {{
+                    try {{
+                        const badges = document.querySelectorAll(sel);
+                        badges.forEach(b => {{
+                            if (!allBadges.includes(b)) allBadges.push(b);
+                        }});
+                    }} catch(e) {{
+                        console.log('선택자 오류:', sel, e);
+                    }}
+                }});
+                
+                console.log('뱃지 버튼 찾음:', allBadges.length);
+                
+                allBadges.forEach(btn => {{
+                    const progress = parseFloat(btn.getAttribute('data-progress')) || 0;
+                    const progressPct = Math.min(100, Math.max(0, progress));
                     
-                    badges.forEach(btn => {{
-                        const progress = parseFloat(btn.getAttribute('data-progress')) || 0;
-                        const progressPct = Math.min(100, Math.max(0, progress));
-                        
-                        // 인라인 스타일로 강제 적용
-                        btn.style.setProperty('background', `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progressPct}}%, ${{lightGreen}} ${{progressPct}}%, ${{lightGreen}} 100%)`, 'important');
-                        btn.style.setProperty('background-image', `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progressPct}}%, ${{lightGreen}} ${{progressPct}}%, ${{lightGreen}} 100%)`, 'important');
-                        btn.style.setProperty('border', `2px solid ${{darkGreen}}`, 'important');
-                        btn.style.setProperty('border-radius', '12px', 'important');
-                        btn.style.setProperty('color', '#ffffff', 'important');
-                        btn.style.setProperty('font-weight', '600', 'important');
-                        
-                        console.log('뱃지 스타일 적용:', btn.id, '진행률:', progressPct + '%');
-                    }});
-                }}
-                
-                // 즉시 실행
+                    // 직접 스타일 적용
+                    const gradient = `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progressPct}}%, ${{lightGreen}} ${{progressPct}}%, ${{lightGreen}} 100%)`;
+                    
+                    // cssText로 강제 적용
+                    const existingStyle = btn.style.cssText || '';
+                    btn.style.cssText = existingStyle + `
+                        background: ${{gradient}} !important;
+                        background-image: ${{gradient}} !important;
+                        border: 2px solid ${{darkGreen}} !important;
+                        border-radius: 12px !important;
+                        color: #ffffff !important;
+                        font-weight: 600 !important;
+                    `;
+                    
+                    // 추가로 setProperty도 사용
+                    btn.style.setProperty('background', gradient, 'important');
+                    btn.style.setProperty('background-image', gradient, 'important');
+                    
+                    console.log('뱃지 스타일 적용:', btn.id || btn.className, '진행률:', progressPct + '%');
+                }});
+            }}
+            
+            // 즉시 실행
+            if (document.readyState === 'loading') {{
+                document.addEventListener('DOMContentLoaded', applyBadgeStyles);
+            }} else {{
                 applyBadgeStyles();
-                
-                // DOM 변경 감지 (MutationObserver)
+            }}
+            
+            // 여러 번 시도
+            setTimeout(applyBadgeStyles, 100);
+            setTimeout(applyBadgeStyles, 500);
+            setTimeout(applyBadgeStyles, 1000);
+            setTimeout(applyBadgeStyles, 2000);
+            setTimeout(applyBadgeStyles, 3000);
+            
+            // MutationObserver로 DOM 변경 감지
+            try {{
                 const observer = new MutationObserver(function(mutations) {{
                     applyBadgeStyles();
                 }});
                 
                 observer.observe(document.body, {{
                     childList: true,
-                    subtree: true
+                    subtree: true,
+                    attributes: true
                 }});
-                
-                // 여러 번 시도 (Streamlit이 동적으로 로드하는 경우 대비)
-                setTimeout(applyBadgeStyles, 100);
-                setTimeout(applyBadgeStyles, 500);
-                setTimeout(applyBadgeStyles, 1000);
-                setTimeout(applyBadgeStyles, 2000);
-            }})();
+            }} catch(e) {{
+                console.log('MutationObserver 오류:', e);
+            }}
+            
+            console.log('뱃지 스타일 스크립트 로드 완료');
             </script>
             """
             st.markdown(js_apply_styles, unsafe_allow_html=True)
