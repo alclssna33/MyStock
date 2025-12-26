@@ -1719,9 +1719,12 @@ with tab2:
                     
                     with badge_cols[idx]:
                         if create_overlay_badge(name, progress_pct, f"badge_{stock_id}"):
-                            st.session_state[f"expand_{stock_id}"] = True
-                            st.session_state[f"scroll_to_{stock_id}"] = True
-                            st.rerun()
+                            # 뱃지 클릭 시 해당 종목의 dialog 호출
+                            df_split_current = load_split_purchase_data()
+                            for idx_inner, stock_inner in df_split_current.iterrows():
+                                if stock_inner.get('Symbol') == stock_id:
+                                    show_stock_detail_dialog(stock_inner, idx_inner)
+                                    break
                 
                 # 나머지 줄들
                 remaining = unique_stocks[num_cols:]
@@ -1739,9 +1742,12 @@ with tab2:
                             
                             with row_cols[col_idx]:
                                 if create_overlay_badge(name, progress_pct, f"badge_{stock_id}_r{row_num}"):
-                                    st.session_state[f"expand_{stock_id}"] = True
-                                    st.session_state[f"scroll_to_{stock_id}"] = True
-                                    st.rerun()
+                                    # 뱃지 클릭 시 해당 종목의 dialog 호출
+                                    df_split_current = load_split_purchase_data()
+                                    for idx_inner, stock_inner in df_split_current.iterrows():
+                                        if stock_inner.get('Symbol') == stock_id:
+                                            show_stock_detail_dialog(stock_inner, idx_inner)
+                                            break
                         row_num += 1
             
         
@@ -1913,9 +1919,12 @@ with tab2:
                             st.markdown(f"<div style='text-align: center; color: #9ca3af;'>{row_idx + 1}</div>", unsafe_allow_html=True)
                         with row_cols[1]:
                             if st.button(name, key=f"stock_link_{stock_id}_{row_idx}", use_container_width=True):
-                                st.session_state[f"expand_{stock_id}"] = True
-                                st.session_state[f"scroll_to_{stock_id}"] = True
-                                st.rerun()
+                                # 종목명 클릭 시 해당 종목의 dialog 호출
+                                df_split_current = load_split_purchase_data()
+                                for idx_inner, stock_inner in df_split_current.iterrows():
+                                    if stock_inner.get('Symbol') == stock_id:
+                                        show_stock_detail_dialog(stock_inner, idx_inner)
+                                        break
                             st.markdown(f"""
                             <style>
                             button[key="stock_link_{stock_id}_{row_idx}"] {{
@@ -1950,16 +1959,30 @@ with tab2:
     # 2. 종목별 카드 표시
     # ==========================================
     if not df_split.empty:
-        st.subheader("📦 종목별 상세 관리")
-        
-        for idx, stock in df_split.iterrows():
-            # Symbol을 stock_id로 사용 (ID 컬럼이 없으므로)
-            stock_id = stock.get('Symbol', f'stock_{idx}')
-            stock_name = stock.get('Name', '')
-            market_cap = stock.get('MarketCap', 0)
-            installments = stock.get('Installments', 3)
-            buy_txs = stock.get('BuyTransactions', []) if isinstance(stock.get('BuyTransactions'), list) else []
-            sell_txs = stock.get('SellTransactions', []) if isinstance(stock.get('SellTransactions'), list) else []
+        # 종목 상세 정보를 보여주는 Dialog 함수
+        def show_stock_detail_dialog(stock_row, stock_idx):
+            """종목 상세 정보를 Modal Popup으로 표시"""
+            # 최신 데이터 로드
+            df_split = load_split_purchase_data()
+            
+            # stock_idx로 다시 찾기 (인덱스가 변경되었을 수 있음)
+            if stock_idx not in df_split.index:
+                # Symbol로 찾기
+                stock_id_to_find = stock_row.get('Symbol')
+                matching_rows = df_split[df_split['Symbol'] == stock_id_to_find]
+                if not matching_rows.empty:
+                    stock_idx = matching_rows.index[0]
+                    stock_row = df_split.loc[stock_idx]
+                else:
+                    st.error("종목을 찾을 수 없습니다.")
+                    return
+            
+            stock_id = stock_row.get('Symbol', f'stock_{stock_idx}')
+            stock_name = stock_row.get('Name', '')
+            market_cap = stock_row.get('MarketCap', 0)
+            installments = stock_row.get('Installments', 3)
+            buy_txs = stock_row.get('BuyTransactions', []) if isinstance(stock_row.get('BuyTransactions'), list) else []
+            sell_txs = stock_row.get('SellTransactions', []) if isinstance(stock_row.get('SellTransactions'), list) else []
             
             # 거래 데이터 파싱
             if isinstance(buy_txs, str):
@@ -2006,34 +2029,8 @@ with tab2:
                     profit = (tx.get('price', 0) - avg_price) * tx.get('quantity', 0)
                     total_realized_profit += profit
             
-            # 종목 카드 (뱃지 클릭 시 열리도록)
-            expander_key = f"expand_{stock_id}"
-            scroll_key = f"scroll_to_{stock_id}"
-            is_expanded = st.session_state.get(expander_key, False)
-            should_scroll = st.session_state.get(scroll_key, False)
-            
-            # Expander에 고유 ID 추가 (스크롤용)
-            st.markdown(f'<div id="stock_detail_{stock_id}"></div>', unsafe_allow_html=True)
-            
-            with st.expander(f"📊 {stock_name}", expanded=is_expanded):
-                # expander가 열렸으면 session_state 초기화
-                if is_expanded:
-                    st.session_state[expander_key] = False
-                
-                # 스크롤이 필요한 경우 (expander 내부에서 실행)
-                if should_scroll:
-                    st.session_state[scroll_key] = False
-                    # JavaScript로 스크롤 이동
-                    st.markdown(f"""
-                    <script>
-                    setTimeout(function() {{
-                        const element = document.getElementById('stock_detail_{stock_id}');
-                        if (element) {{
-                            element.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-                        }}
-                    }}, 300);
-                    </script>
-                    """, unsafe_allow_html=True)
+            # Dialog로 표시
+            with st.dialog(f"📊 {stock_name}"):
                 # 요약 정보
                 col1, col2, col3, col4, col5 = st.columns(5)
                 col1.metric("최대 매수 가능액", f"{max_investment:,.0f}원")
@@ -2058,7 +2055,7 @@ with tab2:
                         )
                     if new_installments != installments:
                         if st.button("적용", key=f"apply_installments_{stock_id}", type="secondary", use_container_width=True):
-                            df_split.at[idx, 'Installments'] = int(new_installments)
+                            df_split.at[stock_idx, 'Installments'] = int(new_installments)
                             save_split_purchase_data(df_split)
                             st.success("분할 횟수가 수정되었습니다!")
                             st.rerun()
@@ -2098,7 +2095,7 @@ with tab2:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 각 회차별로 개별 입력 폼 생성 (이미지 스타일)
+                    # 각 회차별로 개별 입력 폼 생성
                     for i in range(installments):
                         tx = buy_txs[i] if i < len(buy_txs) else None
                         
@@ -2116,7 +2113,7 @@ with tab2:
                             existing_price = float(tx.get('price', 0)) if tx.get('price') else 0.0
                             existing_qty = int(tx.get('quantity', 0)) if tx.get('quantity') else 0
                         
-                        # 카드 형태로 각 행 표시 (간격 최소화)
+                        # 카드 형태로 각 행 표시
                         st.markdown(f"""
                         <div style="
                             background: rgba(255, 255, 255, 0.05);
@@ -2181,16 +2178,16 @@ with tab2:
                                     while len(buy_txs) < installments:
                                         buy_txs.append(None)
                                     
-                                    # 데이터 저장 (buy_price와 buy_qty가 None이 아닌 경우만 체크)
+                                    # 데이터 저장
                                     if buy_date and buy_price is not None and buy_price > 0 and buy_qty is not None and buy_qty > 0:
                                         buy_txs[i] = {
                                             'date': str(buy_date),
-                                            'price': int(buy_price),  # 정수로 저장
+                                            'price': int(buy_price),
                                             'quantity': int(buy_qty)
                                         }
                                         
                                         # 구글 스프레드시트에 저장
-                                        df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
+                                        df_split.at[stock_idx, 'BuyTransactions'] = json.dumps(buy_txs)
                                         save_split_purchase_data(df_split)
                                         st.success(f"회차 {i+1} 매수 기록이 저장되었습니다!")
                                         st.rerun()
@@ -2202,7 +2199,7 @@ with tab2:
                 with col_sell:
                     st.subheader("분할 매도 기록")
                     
-                    # 매도 기록 추가 입력 (폼으로 감싸서 리로드 방지)
+                    # 매도 기록 추가 입력
                     st.caption(f"{stock_name} 매도 기록 추가")
                     with st.form(f"sell_form_{stock_id}", clear_on_submit=True):
                         col_sell_input1, col_sell_input2, col_sell_input3, col_sell_input4 = st.columns([2, 2, 2, 1], vertical_alignment="bottom")
@@ -2225,14 +2222,14 @@ with tab2:
                                         'quantity': int(sell_qty)
                                     }
                                     sell_txs.append(new_sell)
-                                    df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
+                                    df_split.at[stock_idx, 'SellTransactions'] = json.dumps(sell_txs)
                                     save_split_purchase_data(df_split)
                                     st.success("매도 기록이 저장되었습니다!")
                                     st.rerun()
                     
                     st.divider()
                     
-                    # 매도 기록 테이블 (매수 기록과 동일한 스타일)
+                    # 매도 기록 테이블
                     if sell_txs:
                         # 테이블 헤더
                         st.markdown("""
@@ -2269,7 +2266,7 @@ with tab2:
                                     except:
                                         tx_date = datetime.now().date()
                                 
-                                # 카드 형태로 각 행 표시 (간격 최소화)
+                                # 카드 형태로 각 행 표시
                                 st.markdown(f"""
                                 <div style="
                                     background: rgba(255, 255, 255, 0.05);
@@ -2306,7 +2303,7 @@ with tab2:
                                 with col_action:
                                     if st.button("삭제", key=f"delete_sell_{stock_id}_{i}", type="primary", use_container_width=True):
                                         sell_txs.pop(i)
-                                        df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
+                                        df_split.at[stock_idx, 'SellTransactions'] = json.dumps(sell_txs)
                                         save_split_purchase_data(df_split)
                                         st.success("매도 기록이 삭제되었습니다!")
                                         st.rerun()
@@ -2315,9 +2312,12 @@ with tab2:
                     else:
                         st.info("매도 기록이 없습니다.")
                 
-                # 종목 삭제
+                # 종목 삭제 버튼
+                st.divider()
                 if st.button(f"🗑️ {stock_name} 삭제", key=f"delete_stock_{stock_id}", type="secondary"):
-                    df_split = df_split.drop(idx).reset_index(drop=True)
+                    df_split = df_split.drop(stock_idx).reset_index(drop=True)
                     save_split_purchase_data(df_split)
-                    st.success(f"{stock_name}이(가) 삭제되었습니다!")
+                    st.success(f"{stock_name} 종목이 삭제되었습니다!")
                     st.rerun()
+        
+        # 기존 Expander 루프는 제거됨 - 클릭 시에만 dialog 호출
