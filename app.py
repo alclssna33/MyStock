@@ -1335,46 +1335,89 @@ with tab2:
                 with col_buy:
                     st.subheader("매수 계획 및 기록")
                     
-                    # 매수 테이블
+                    # 매수 테이블 데이터 준비
                     buy_data = []
                     for i in range(installments):
                         tx = buy_txs[i] if i < len(buy_txs) else None
-                        estimated_qty = int(amount_per_installment / tx.get('price', 1)) if tx and tx.get('price', 0) > 0 else 0
+                        price = float(tx.get('price', 0)) if tx and tx.get('price') else 0.0
+                        estimated_qty = int(amount_per_installment / price) if price > 0 else 0
                         buy_data.append({
                             '회차': i + 1,
-                            '날짜': tx.get('date', '') if tx else '',
+                            '날짜': tx.get('date', '') if tx and tx.get('date') else '',
                             '목표액': f"{amount_per_installment:,.0f}원",
-                            '매수가': tx.get('price', '') if tx else '',
+                            '매수가': price,
                             '예상': f"{estimated_qty:,}" if estimated_qty > 0 else '-',
-                            '매수량': tx.get('quantity', '') if tx else ''
+                            '매수량': int(tx.get('quantity', 0)) if tx and tx.get('quantity') else 0
                         })
                     
                     buy_df = pd.DataFrame(buy_data)
-                    st.dataframe(buy_df, use_container_width=True, hide_index=True)
                     
-                    # 매수 기록 입력
-                    with st.form(f"buy_form_{stock_id}"):
-                        st.caption(f"{stock_name} 매수 기록")
-                        buy_round = st.number_input("회차", min_value=1, max_value=installments, value=1, key=f"buy_round_{stock_id}")
-                        buy_date = st.date_input("날짜", datetime.now(), key=f"buy_date_{stock_id}")
-                        buy_price = st.number_input("매수가 (원)", min_value=0, step=100, key=f"buy_price_{stock_id}")
-                        buy_qty = st.number_input("매수량 (주)", min_value=1, step=1, key=f"buy_qty_{stock_id}")
+                    # 편집 가능한 테이블 (날짜, 매수가, 매수량만 편집 가능)
+                    edited_df = st.data_editor(
+                        buy_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            '회차': st.column_config.NumberColumn('회차', disabled=True),
+                            '날짜': st.column_config.TextColumn('날짜', width="medium", help="YYYY-MM-DD 형식으로 입력하세요"),
+                            '목표액': st.column_config.TextColumn('목표액', disabled=True),
+                            '매수가': st.column_config.NumberColumn('매수가 (원)', min_value=0.0, step=100.0, format="%.0f"),
+                            '예상': st.column_config.TextColumn('예상', disabled=True),
+                            '매수량': st.column_config.NumberColumn('매수량 (주)', min_value=0, step=1, format="%d")
+                        },
+                        key=f"buy_editor_{stock_id}",
+                        num_rows="fixed"
+                    )
+                    
+                    # 예상 수량 자동 계산 및 표시 업데이트
+                    for i in range(len(edited_df)):
+                        price = float(edited_df.iloc[i]['매수가']) if pd.notna(edited_df.iloc[i]['매수가']) else 0.0
+                        if price > 0:
+                            estimated_qty = int(amount_per_installment / price)
+                            edited_df.iloc[i, edited_df.columns.get_loc('예상')] = f"{estimated_qty:,}"
+                        else:
+                            edited_df.iloc[i, edited_df.columns.get_loc('예상')] = '-'
+                    
+                    # 저장 버튼
+                    if st.button("💾 저장", key=f"save_buy_{stock_id}", type="primary"):
+                        # buy_txs 리스트 초기화 및 확장
+                        while len(buy_txs) < installments:
+                            buy_txs.append(None)
                         
-                        if st.form_submit_button("기록"):
-                            # buy_txs 리스트 확장
-                            while len(buy_txs) < installments:
-                                buy_txs.append(None)
+                        # 편집된 데이터를 buy_txs에 반영
+                        for i in range(installments):
+                            row = edited_df.iloc[i]
+                            date_str = str(row['날짜']).strip() if pd.notna(row['날짜']) else ''
+                            price = float(row['매수가']) if pd.notna(row['매수가']) and row['매수가'] > 0 else 0.0
+                            quantity = int(row['매수량']) if pd.notna(row['매수량']) and row['매수량'] > 0 else 0
                             
-                            buy_txs[buy_round - 1] = {
-                                'date': str(buy_date),
-                                'price': float(buy_price),
-                                'quantity': int(buy_qty)
-                            }
+                            # 날짜 형식 검증 및 정규화
+                            if date_str:
+                                try:
+                                    # YYYY-MM-DD 형식으로 변환 시도
+                                    parsed_date = pd.to_datetime(date_str)
+                                    date_str = parsed_date.strftime("%Y-%m-%d")
+                                except:
+                                    # 날짜 형식이 잘못된 경우 경고
+                                    st.warning(f"회차 {i+1}의 날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.")
+                                    continue
                             
-                            df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
-                            save_split_purchase_data(df_split)
-                            st.success("매수 기록이 저장되었습니다!")
-                            st.rerun()
+                            # 데이터가 있는 경우 저장
+                            if date_str or price > 0 or quantity > 0:
+                                buy_txs[i] = {
+                                    'date': date_str,
+                                    'price': price,
+                                    'quantity': quantity
+                                }
+                            else:
+                                # 모두 비어있으면 None
+                                buy_txs[i] = None
+                        
+                        # 구글 스프레드시트에 저장
+                        df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
+                        save_split_purchase_data(df_split)
+                        st.success("매수 기록이 저장되었습니다!")
+                        st.rerun()
                 
                 with col_sell:
                     st.subheader("분할 매도 기록")
