@@ -1628,7 +1628,70 @@ with tab2:
         if portfolio_data:
             st.markdown("### 종목별 현황")
             
-            # 뱃지들을 그리드로 표시 (순수 Streamlit 버튼 사용)
+            # 오버레이 뱃지 생성 함수
+            def create_overlay_badge(name, progress, key):
+                """CSS 오버레이 기법으로 뱃지 생성"""
+                progress_pct = min(100, max(0, progress))
+                dark_green = '#10b981'
+                light_green = '#86efac'
+                gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
+                
+                # Layer 1: Visual HTML div (그라데이션 뱃지)
+                st.markdown(f"""
+                <div class="badge-overlay-visual" style="
+                    background: {gradient};
+                    border: 2px solid {dark_green};
+                    border-radius: 12px;
+                    color: #ffffff;
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    padding: 0.8rem 1.5rem;
+                    min-height: 48px;
+                    text-align: center;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-family: 'Pretendard', sans-serif;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    transition: all 0.3s ease;
+                    margin-bottom: 0;
+                    position: relative;
+                    z-index: 1;
+                ">{name}</div>
+                """, unsafe_allow_html=True)
+                
+                # Layer 2: 투명 버튼 (클릭 이벤트 처리)
+                # CSS로 버튼을 투명하게 하고 음수 마진으로 겹치기
+                button_css_key = f"badge_button_{key.replace('badge_', '').replace('_r', '_').replace('-', '_')}"
+                st.markdown(f"""
+                <style>
+                div[data-testid="stButton"]:has(button[key="{key}"]) {{
+                    margin-top: -48px !important;
+                    position: relative !important;
+                    z-index: 10 !important;
+                    pointer-events: auto !important;
+                }}
+                div[data-testid="stButton"]:has(button[key="{key}"]) button {{
+                    opacity: 0 !important;
+                    background: transparent !important;
+                    border: none !important;
+                    color: transparent !important;
+                    cursor: pointer !important;
+                    min-height: 48px !important;
+                    padding: 0.8rem 1.5rem !important;
+                }}
+                div[data-testid="stButton"]:has(button[key="{key}"]) button:hover {{
+                    opacity: 0 !important;
+                }}
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # 투명 버튼 생성
+                if st.button(name, key=key, use_container_width=True):
+                    return True
+                return False
+            
+            # 뱃지들을 그리드로 표시 (CSS 오버레이 기법)
             sorted_stocks = sorted(portfolio_data, key=lambda x: x['totalInvested'], reverse=True)
             
             # 중복 방지
@@ -1652,12 +1715,7 @@ with tab2:
                     progress_pct = min(100, max(0, progress))
                     
                     with badge_cols[idx]:
-                        if st.button(
-                            name,
-                            key=f"badge_{stock_id}",
-                            use_container_width=True,
-                            help=f"매수 진행률: {progress_pct:.1f}%"
-                        ):
+                        if create_overlay_badge(name, progress_pct, f"badge_{stock_id}"):
                             st.session_state[f"expand_{stock_id}"] = True
                             st.session_state[f"scroll_to_{stock_id}"] = True
                             st.rerun()
@@ -1677,159 +1735,11 @@ with tab2:
                             progress_pct = min(100, max(0, progress))
                             
                             with row_cols[col_idx]:
-                                if st.button(
-                                    name,
-                                    key=f"badge_{stock_id}_r{row_num}",
-                                    use_container_width=True,
-                                    help=f"매수 진행률: {progress_pct:.1f}%"
-                                ):
+                                if create_overlay_badge(name, progress_pct, f"badge_{stock_id}_r{row_num}"):
                                     st.session_state[f"expand_{stock_id}"] = True
                                     st.session_state[f"scroll_to_{stock_id}"] = True
                                     st.rerun()
                         row_num += 1
-            
-            # 뱃지 버튼 스타일링 (JavaScript로 직접 스타일 적용)
-            if unique_stocks:
-                # 진행률 데이터 준비 (종목명을 키로 사용)
-                progress_map = {stock['name']: min(100, max(0, stock['progress'])) for stock in unique_stocks}
-                
-                st.markdown(f"""
-                <style>
-                /* 뱃지 버튼 기본 스타일 - JavaScript로 적용될 버튼을 위한 클래스 */
-                .stock-badge-button {{
-                    border: 2px solid #10b981 !important;
-                    border-radius: 12px !important;
-                    color: #ffffff !important;
-                    font-weight: 600 !important;
-                    font-size: 0.95rem !important;
-                    padding: 0.8rem 1.5rem !important;
-                    transition: all 0.3s ease !important;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
-                    font-family: 'Pretendard', sans-serif !important;
-                    min-height: 48px !important;
-                }}
-                
-                .stock-badge-button:hover {{
-                    transform: scale(1.05) !important;
-                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
-                }}
-                </style>
-                
-                <script>
-                (function() {{
-                    const progressMap = {json.dumps(progress_map)};
-                    const darkGreen = '#10b981';
-                    const lightGreen = '#86efac';
-                    
-                    console.log('ProgressMap:', progressMap);
-                    
-                    function applyGradients() {{
-                        // 모든 Streamlit 버튼 찾기
-                        const allButtons = document.querySelectorAll('div[data-testid="stButton"] button');
-                        
-                        console.log('Total buttons found:', allButtons.length);
-                        
-                        allButtons.forEach((btn, index) => {{
-                            // 버튼의 텍스트(종목명) 가져오기 - 여러 방법 시도
-                            let buttonText = btn.textContent.trim();
-                            
-                            // innerText도 시도 (더 정확할 수 있음)
-                            if (!buttonText || buttonText.length === 0) {{
-                                buttonText = btn.innerText.trim();
-                            }}
-                            
-                            // p 태그 내부 텍스트도 확인
-                            const pTag = btn.querySelector('p');
-                            if (pTag && pTag.textContent.trim()) {{
-                                buttonText = pTag.textContent.trim();
-                            }}
-                            
-                            // span 태그 내부 텍스트도 확인
-                            const spanTag = btn.querySelector('span');
-                            if (spanTag && spanTag.textContent.trim() && !buttonText) {{
-                                buttonText = spanTag.textContent.trim();
-                            }}
-                            
-                            // 빈 텍스트는 스킵
-                            if (!buttonText || buttonText.length === 0) {{
-                                return;
-                            }}
-                            
-                            // progressMap에서 해당 종목명 찾기 (정확히 일치하는 것부터)
-                            let progress = null;
-                            let matchedName = null;
-                            
-                            if (progressMap[buttonText] !== undefined) {{
-                                progress = progressMap[buttonText];
-                                matchedName = buttonText;
-                            }} else {{
-                                // 부분 일치 시도
-                                for (const [name, prog] of Object.entries(progressMap)) {{
-                                    if (buttonText === name || buttonText.includes(name) || name.includes(buttonText)) {{
-                                        progress = prog;
-                                        matchedName = name;
-                                        break;
-                                    }}
-                                }}
-                            }}
-                            
-                            if (progress !== null && matchedName) {{
-                                const gradient = `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progress}}%, ${{lightGreen}} ${{progress}}%, ${{lightGreen}} 100%)`;
-                                
-                                // 클래스 추가
-                                btn.classList.add('stock-badge-button');
-                                
-                                // 그라데이션 및 기본 스타일 적용
-                                btn.style.background = gradient;
-                                btn.style.backgroundImage = gradient;
-                                btn.style.setProperty('background', gradient, 'important');
-                                btn.style.setProperty('background-image', gradient, 'important');
-                                btn.style.setProperty('color', '#ffffff', 'important');
-                                btn.style.setProperty('border', '2px solid #10b981', 'important');
-                                btn.style.setProperty('border-radius', '12px', 'important');
-                                btn.style.setProperty('font-weight', '600', 'important');
-                                btn.style.setProperty('font-size', '0.95rem', 'important');
-                                btn.style.setProperty('padding', '0.8rem 1.5rem', 'important');
-                                btn.style.setProperty('min-height', '48px', 'important');
-                                
-                                console.log(`Applied gradient to "${{buttonText}}" (matched: "${{matchedName}}"): ${{progress}}%`);
-                            }}
-                        }});
-                    }}
-                    
-                    // 즉시 실행
-                    applyGradients();
-                    
-                    // DOM 로드 후 실행
-                    if (document.readyState === 'loading') {{
-                        document.addEventListener('DOMContentLoaded', applyGradients);
-                    }}
-                    
-                    // 여러 번 시도 (Streamlit 렌더링 지연 대응)
-                    setTimeout(applyGradients, 100);
-                    setTimeout(applyGradients, 300);
-                    setTimeout(applyGradients, 500);
-                    setTimeout(applyGradients, 1000);
-                    setTimeout(applyGradients, 2000);
-                    
-                    // MutationObserver로 DOM 변경 감지
-                    const observer = new MutationObserver(function(mutations) {{
-                        applyGradients();
-                    }});
-                    
-                    try {{
-                        observer.observe(document.body, {{ 
-                            childList: true, 
-                            subtree: true,
-                            characterData: true,
-                            attributes: true
-                        }});
-                    }} catch(e) {{
-                        console.log('Observer 오류:', e);
-                    }}
-                }})();
-                </script>
-                """, unsafe_allow_html=True)
             
         
         # 전체 현황판 (드롭다운 기능 포함)
