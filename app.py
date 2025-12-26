@@ -1544,7 +1544,8 @@ with tab2:
     @st.dialog("📊 종목 상세 관리")
     def show_stock_detail_modal(stock_id):
         """종목 상세 정보를 Modal Popup으로 표시"""
-        # 최신 데이터 로드
+        # 최신 데이터 로드 (캐시 클리어하여 최신 데이터 가져오기)
+        load_split_purchase_data.clear()
         df_split = load_split_purchase_data()
         
         # stock_id로 종목 찾기
@@ -1560,20 +1561,46 @@ with tab2:
         stock_name = stock_row.get('Name', '')
         market_cap = stock_row.get('MarketCap', 0)
         installments = stock_row.get('Installments', 3)
-        buy_txs = stock_row.get('BuyTransactions', []) if isinstance(stock_row.get('BuyTransactions'), list) else []
-        sell_txs = stock_row.get('SellTransactions', []) if isinstance(stock_row.get('SellTransactions'), list) else []
         
-        # 거래 데이터 파싱
-        if isinstance(buy_txs, str):
-            try:
-                buy_txs = json.loads(buy_txs) if buy_txs and buy_txs != '[]' else []
-            except:
+        # BuyTransactions 파싱 (더 안전한 방식)
+        buy_txs_raw = stock_row.get('BuyTransactions', '[]')
+        buy_txs = []
+        if pd.notna(buy_txs_raw) and str(buy_txs_raw).strip():
+            if isinstance(buy_txs_raw, list):
+                buy_txs = buy_txs_raw
+            elif isinstance(buy_txs_raw, str):
+                try:
+                    buy_txs_str = str(buy_txs_raw).strip()
+                    if buy_txs_str and buy_txs_str != '[]' and buy_txs_str != '':
+                        buy_txs = json.loads(buy_txs_str)
+                    else:
+                        buy_txs = []
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    buy_txs = []
+            else:
                 buy_txs = []
-        if isinstance(sell_txs, str):
-            try:
-                sell_txs = json.loads(sell_txs) if sell_txs and sell_txs != '[]' else []
-            except:
+        else:
+            buy_txs = []
+        
+        # SellTransactions 파싱 (더 안전한 방식)
+        sell_txs_raw = stock_row.get('SellTransactions', '[]')
+        sell_txs = []
+        if pd.notna(sell_txs_raw) and str(sell_txs_raw).strip():
+            if isinstance(sell_txs_raw, list):
+                sell_txs = sell_txs_raw
+            elif isinstance(sell_txs_raw, str):
+                try:
+                    sell_txs_str = str(sell_txs_raw).strip()
+                    if sell_txs_str and sell_txs_str != '[]' and sell_txs_str != '':
+                        sell_txs = json.loads(sell_txs_str)
+                    else:
+                        sell_txs = []
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    sell_txs = []
+            else:
                 sell_txs = []
+        else:
+            sell_txs = []
         
         # MarketCap을 안전하게 숫자로 변환
         try:
