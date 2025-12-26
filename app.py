@@ -2242,7 +2242,8 @@ with tab2:
                 return False
             
             # 뱃지들을 그리드로 표시 (CSS 오버레이 기법)
-            sorted_stocks = sorted(portfolio_data, key=lambda x: x['totalInvested'], reverse=True)
+            # 가나다 순으로 정렬
+            sorted_stocks = sorted(portfolio_data, key=lambda x: x['name'])
             
             # 중복 방지
             added_stock_ids = set()
@@ -2346,17 +2347,17 @@ with tab2:
                     }
                     .portfolio-table-row {
                         display: grid;
-                        grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
+                        grid-template-columns: 0.5fr 1.33fr 2fr 2fr 1fr;
                         gap: 1rem;
                         padding: 0.8rem 1rem;
-                        background: rgba(30, 41, 59, 0.3);
+                        background: rgba(59, 130, 246, 0.15);
                         border-radius: 6px;
                         margin-bottom: 0.3rem;
                         align-items: center;
                         transition: background 0.2s;
                     }
                     .portfolio-table-row:hover {
-                        background: rgba(99, 102, 241, 0.2);
+                        background: rgba(59, 130, 246, 0.25);
                     }
                     .stock-name-link {
                         color: #60a5fa !important;
@@ -2391,7 +2392,8 @@ with tab2:
                     """, unsafe_allow_html=True)
                     
                     # 테이블 헤더 (클릭 가능한 정렬 버튼)
-                    header_cols = st.columns([0.5, 2, 2, 2, 1])
+                    # 종목명 가로 길이를 2/3로 줄임: 2 * 2/3 = 1.33
+                    header_cols = st.columns([0.5, 1.33, 2, 2, 1])
                     with header_cols[0]:
                         st.markdown("<div style='text-align: center; font-weight: 600; color: #ffffff;'>#</div>", unsafe_allow_html=True)
                     
@@ -2453,7 +2455,8 @@ with tab2:
                             progress_color = "#6366f1"
                         
                         # 종목명 클릭 시 해당 종목으로 이동
-                        row_cols = st.columns([0.5, 2, 2, 2, 1])
+                        # 종목명 가로 길이를 2/3로 줄임: 2 * 2/3 = 1.33
+                        row_cols = st.columns([0.5, 1.33, 2, 2, 1])
                         with row_cols[0]:
                             st.markdown(f"<div style='text-align: center; color: #9ca3af;'>{row_idx + 1}</div>", unsafe_allow_html=True)
                         with row_cols[1]:
