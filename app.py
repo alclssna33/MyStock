@@ -333,21 +333,60 @@ def save_stocks(df):
         st.error(f"❌ 데이터 저장 실패: {str(e)}")
         raise
 
-# 주가 데이터 가져오기 (캐싱)
-@st.cache_data(ttl=3600)  # 1시간 캐싱
+# 주가 데이터 가져오기 (캐싱 + 재시도 로직)
+@st.cache_data(ttl=7200)  # 2시간 캐싱 (rate limiting 방지)
 def get_stock_data(symbol):
-    try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period="max")
-        # 타임존 정보 제거 (yfinance 데이터의 인덱스에 타임존이 포함되어 있어서 제거)
-        if df.index.tz is not None:
-            df.index = df.index.tz_localize(None)
-        # 인덱스를 날짜만 남기고 시간 정보 제거 (정규화)
-        df.index = pd.to_datetime(df.index).normalize()
-        return df
-    except Exception as e:
-        st.error(f"데이터를 가져오는 중 오류가 발생했습니다: {str(e)}")
-        return None
+    max_retries = 3
+    retry_delay = 2  # 초기 지연 시간 (초)
+    
+    for attempt in range(max_retries):
+        try:
+            # 요청 간 지연 (rate limiting 방지)
+            if attempt > 0:
+                time.sleep(retry_delay * (attempt + 1))  # 지수 백오프
+            
+            ticker = yf.Ticker(symbol)
+            df = ticker.history(period="max")
+            
+            # 빈 데이터 체크
+            if df.empty:
+                if attempt < max_retries - 1:
+                    continue
+                st.warning(f"{symbol} 종목의 데이터가 비어있습니다. 티커를 확인해주세요.")
+                return None
+            
+            # 타임존 정보 제거 (yfinance 데이터의 인덱스에 타임존이 포함되어 있어서 제거)
+            if df.index.tz is not None:
+                df.index = df.index.tz_localize(None)
+            # 인덱스를 날짜만 남기고 시간 정보 제거 (정규화)
+            df.index = pd.to_datetime(df.index).normalize()
+            return df
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            # Rate limiting 오류 감지
+            if "too many requests" in error_msg or "rate limit" in error_msg or "429" in error_msg:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)  # 지수 백오프
+                    st.warning(f"요청이 너무 많습니다. {wait_time}초 후 재시도합니다... ({attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    st.error(f"❌ API 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.")
+                    st.info("💡 팁: 잠시 기다린 후 페이지를 새로고침하거나, 다른 종목을 먼저 확인해보세요.")
+                    return None
+            
+            # 기타 오류
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                st.error(f"❌ {symbol} 종목의 데이터를 가져올 수 없습니다: {str(e)}")
+                st.info("💡 티커 형식을 확인해주세요. 예: AAPL, 005930.KS, TSLA")
+                return None
+    
+    return None
 
 # ==========================================
 # 분할 매수 플래너 관련 함수들
