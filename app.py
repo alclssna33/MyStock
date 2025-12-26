@@ -2,1033 +2,520 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
+import plotly.express as px
 import os
 import time
-import json
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# 페이지 설정
+# --- 1. 페이지 및 스타일 설정 ---
 st.set_page_config(
-    page_title="나만의 주식 추적기",
+    page_title="나만의 주식 통합 관리",
     page_icon="📈",
     layout="wide"
 )
 
-# 모던 핀테크 스타일 CSS 주입
+# 모던 핀테크 스타일 CSS (기존 스타일 유지)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
     
-    /* === 1. 전체 기본 텍스트 (흰색) === */
     .stApp {
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         font-family: 'Pretendard', sans-serif;
         color: #FFFFFF !important;
     }
     
-    /* 기본 텍스트 요소들은 흰색 */
-    h1, h2, h3, h4, h5, h6, p, label, span, div {
-        color: #FFFFFF;
-    }
-
-    /* === 2. 입력 필드 스타일 (배경 화이트, 글자 블랙) === */
-    /* Input, Textarea 스타일 */
-    input, textarea {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        caret-color: #000000 !important;
-    }
-
-    /* === [핵심 수정] 3. Selectbox (종목선택, 기간선택, 삭제박스) === */
-    /* Selectbox 컨테이너 (닫혀있을 때) */
-    div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    }
+    h1, h2, h3, h4, h5, h6, p, label, span, div { color: #FFFFFF; }
     
-    /* [중요] Selectbox 내부에 표시되는 '선택된 값' 강제 검은색 */
-    /* 내부의 div, span, p 등 모든 텍스트 요소를 검은색으로 덮어씀 */
-    div[data-baseweb="select"] > div * {
+    /* 입력 필드 및 선택박스 스타일 */
+    input, textarea, select, div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border-radius: 5px;
+    }
+    /* 드롭다운 메뉴 텍스트 블랙 강제 */
+    div[data-baseweb="popover"] *, div[data-baseweb="menu"] *, ul[data-baseweb="menu"] * {
         color: #000000 !important;
     }
     
-    /* Dropdown 메뉴 (펼쳤을 때 리스트) */
-    div[data-baseweb="popover"],
-    div[data-baseweb="menu"],
-    ul[data-baseweb="menu"] {
-        background-color: #FFFFFF !important;
+    /* 탭 스타일 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+        background-color: rgba(255,255,255,0.05);
+        padding: 10px;
+        border-radius: 10px;
     }
-    
-    /* Dropdown 메뉴 내부 텍스트 */
-    div[data-baseweb="popover"] *,
-    div[data-baseweb="menu"] *,
-    ul[data-baseweb="menu"] * {
-        color: #000000 !important;
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        border-radius: 5px;
+        color: #aaaaaa;
     }
-
-    /* === 4. 달력(Calendar) 스타일 === */
-    div[data-baseweb="calendar"] {
-        background-color: #FFFFFF !important;
-    }
-    div[data-baseweb="calendar"] * {
-        color: #000000 !important;
+    .stTabs [aria-selected="true"] {
+        background-color: #6366f1 !important;
+        color: white !important;
+        font-weight: bold;
     }
 
-    /* === 5. 버튼 스타일 === */
+    /* 메트릭 박스 */
+    div[data-testid="stMetric"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    div[data-testid="stMetric"] label { color: #cfcfcf !important; }
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #ffffff !important; font-weight: 700; }
+
+    /* 버튼 스타일 */
     .stButton > button {
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-        color: #FFFFFF !important; /* 버튼 글씨는 흰색 */
-        border: none !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
-    }
-    /* 버튼 내부 텍스트 흰색 강제 */
-    .stButton > button p {
-        color: #FFFFFF !important;
-    }
-
-    /* === 6. 사이드바 스타일 === */
-    section[data-testid="stSidebar"] {
-        background-color: #262730 !important;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
-    }
-    /* 사이드바 입력창 예외 처리 (검은 글씨) */
-    section[data-testid="stSidebar"] input,
-    section[data-testid="stSidebar"] textarea {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-    }
-    /* 사이드바 Selectbox 예외 처리 */
-    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-    }
-    section[data-testid="stSidebar"] div[data-baseweb="select"] > div * {
-        color: #000000 !important;
-    }
-    /* 사이드바 버튼 */
-    section[data-testid="stSidebar"] button {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-        color: #FFFFFF !important;
-    }
-
-    /* === 7. '정보 수정하기' Expander 스타일 === */
-    .streamlit-expanderHeader {
-        background: linear-gradient(135deg, #FFF9C4 0%, #FFE082 100%) !important;
-        border: 2px solid #FFD54F !important;
-        border-radius: 10px !important;
-        color: #5D4037 !important;
-    }
-    .streamlit-expanderHeader p, 
-    .streamlit-expanderHeader span,
-    .streamlit-expanderHeader svg {
-        color: #5D4037 !important;
-        fill: #5D4037 !important;
-    }
-    [data-testid="stExpanderDetails"] {
-        background: rgba(255, 249, 196, 0.1) !important;
-        border: 1px solid #FFD54F !important;
+        color: white !important;
+        border: none;
+        font-weight: bold;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Google Sheets 설정
-SPREADSHEET_NAME = "stock_db"
-SCOPE = ['https://spreadsheets.google.com/feeds',
-         'https://www.googleapis.com/auth/drive']
+# --- 2. 구글 시트 연결 설정 ---
+SPREADSHEET_NAME = "Integrated_Stock_DB"  # 통합 DB 이름
+SCOPE = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 
-# Google Sheets 클라이언트 가져오기 (캐싱)
 @st.cache_resource
 def get_google_sheets_client():
-    """Google Sheets API 클라이언트를 반환합니다."""
     try:
-        # Streamlit secrets에서 가져오기 시도
         if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
             creds_dict = dict(st.secrets['gcp_service_account'])
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-        # secrets.json 파일에서 가져오기
         elif os.path.exists("secrets.json"):
             creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", SCOPE)
         else:
-            st.error("❌ Google Sheets 인증 정보를 찾을 수 없습니다.\n\n"
-                    "다음 중 하나를 설정해주세요:\n"
-                    "1. Streamlit secrets에 'gcp_service_account' 키 추가\n"
-                    "2. 프로젝트 루트에 'secrets.json' 파일 추가")
+            st.error("❌ 인증 파일을 찾을 수 없습니다.")
             st.stop()
-        
-        client = gspread.authorize(creds)
-        return client
+        return gspread.authorize(creds)
     except Exception as e:
-        st.error(f"❌ Google Sheets 연결 실패: {str(e)}\n\n"
-                "secrets.json 파일이 올바른 형식인지 확인해주세요.")
+        st.error(f"❌ 구글 시트 연결 실패: {e}")
         st.stop()
 
-# Google Sheets 초기화
 def init_google_sheet():
-    """Google Sheets 스프레드시트와 워크시트를 초기화합니다."""
+    client = get_google_sheets_client()
     try:
-        client = get_google_sheets_client()
-        
-        # 스프레드시트 찾기 또는 생성
-        try:
-            spreadsheet = client.open(SPREADSHEET_NAME)
-        except gspread.SpreadsheetNotFound:
-            # 스프레드시트가 없으면 생성
-            spreadsheet = client.create(SPREADSHEET_NAME)
-            st.info(f"✅ 새 스프레드시트 '{SPREADSHEET_NAME}'가 생성되었습니다.")
-        
-        # 워크시트 찾기 또는 생성
-        try:
-            worksheet = spreadsheet.worksheet("Stocks")
-        except gspread.WorksheetNotFound:
-            worksheet = spreadsheet.add_worksheet(title="Stocks", rows=1000, cols=30)
-        
-        # 헤더 확인 및 추가
-        headers = worksheet.row_values(1)
-        expected_columns = ["Symbol", "Name", "InterestDate", "Note"]
-        for i in range(1, 11):
-            expected_columns.append(f"BuyDate{i}")
-            expected_columns.append(f"SellDate{i}")
-        
-        if not headers or headers != expected_columns:
-            # 헤더 업데이트
-            worksheet.clear()
-            worksheet.append_row(expected_columns)
-            st.info("✅ Google Sheets 헤더가 업데이트되었습니다.")
-        
-        return spreadsheet, worksheet
-    except Exception as e:
-        st.error(f"❌ Google Sheets 초기화 실패: {str(e)}")
+        spreadsheet = client.open(SPREADSHEET_NAME)
+    except gspread.SpreadsheetNotFound:
+        st.error(f"❌ '{SPREADSHEET_NAME}' 스프레드시트를 찾을 수 없습니다. 구글 드라이브에 파일이 있는지 확인해주세요.")
         st.stop()
+    return spreadsheet
 
-# Google Sheets에서 데이터 읽기
-@st.cache_data(ttl=60)  # 1분 캐싱 (데이터 변경 시 빠른 반영)
-def load_stocks():
-    """Google Sheets에서 종목 데이터를 로드합니다."""
-    try:
-        client = get_google_sheets_client()
-        spreadsheet = client.open(SPREADSHEET_NAME)
-        worksheet = spreadsheet.worksheet("Stocks")
-        
-        # 모든 데이터 가져오기
-        records = worksheet.get_all_records()
-        
-        if not records:
-            # 빈 DataFrame 반환 (헤더만 있는 경우)
-            columns = ["Symbol", "Name", "InterestDate", "Note"]
-            for i in range(1, 11):
-                columns.append(f"BuyDate{i}")
-                columns.append(f"SellDate{i}")
-            return pd.DataFrame(columns=columns)
-        
-        # DataFrame으로 변환
-        df = pd.DataFrame(records)
-        
-        # 빈 값 처리 (Google Sheets는 빈 셀을 빈 문자열로 반환)
-        df = df.replace("", pd.NA)
-        
-        return df
-    except Exception as e:
-        st.error(f"❌ 데이터 로드 실패: {str(e)}")
-        # 빈 DataFrame 반환
-        columns = ["Symbol", "Name", "InterestDate", "Note"]
-        for i in range(1, 11):
-            columns.append(f"BuyDate{i}")
-            columns.append(f"SellDate{i}")
-        return pd.DataFrame(columns=columns)
+# --- 3. 데이터 로드 및 저장 함수 ---
 
-# Google Sheets에 데이터 저장
-def save_stocks(df):
-    """DataFrame을 Google Sheets에 저장합니다."""
+def load_data():
+    """Stocks와 Transactions 데이터를 모두 로드합니다."""
+    client = get_google_sheets_client()
+    spreadsheet = client.open(SPREADSHEET_NAME)
+    
+    # Stocks 탭 로드
     try:
-        client = get_google_sheets_client()
-        spreadsheet = client.open(SPREADSHEET_NAME)
-        worksheet = spreadsheet.worksheet("Stocks")
+        ws_stocks = spreadsheet.worksheet("Stocks")
+        stocks_data = ws_stocks.get_all_records()
+        df_stocks = pd.DataFrame(stocks_data)
+        # 필수 컬럼이 없으면 빈 DataFrame 처리
+        if df_stocks.empty and 'Symbol' not in df_stocks.columns:
+             df_stocks = pd.DataFrame(columns=["Symbol", "Name", "Category", "Strategy", "TargetAmount", "PlanCount", "InterestDate", "Note"])
+    except:
+        df_stocks = pd.DataFrame(columns=["Symbol", "Name", "Category", "Strategy", "TargetAmount", "PlanCount", "InterestDate", "Note"])
+
+    # Transactions 탭 로드
+    try:
+        ws_trans = spreadsheet.worksheet("Transactions")
+        trans_data = ws_trans.get_all_records()
+        df_trans = pd.DataFrame(trans_data)
+        if df_trans.empty and 'Symbol' not in df_trans.columns:
+            df_trans = pd.DataFrame(columns=["Date", "Symbol", "Type", "Price", "Quantity", "Round", "Note"])
+    except:
+         df_trans = pd.DataFrame(columns=["Date", "Symbol", "Type", "Price", "Quantity", "Round", "Note"])
+    
+    return df_stocks, df_trans
+
+def add_stock_to_db(symbol, name, strategy, target_amt, plan_count, note):
+    """Stocks 시트에 새 종목 추가 (관심종목 등록)"""
+    client = get_google_sheets_client()
+    ws = client.open(SPREADSHEET_NAME).worksheet("Stocks")
+    # Category는 기본적으로 'Interest'로 시작
+    ws.append_row([symbol.upper(), name, "Interest", strategy, target_amt, plan_count, str(datetime.now().date()), note])
+    st.cache_data.clear()
+
+def add_transaction_to_db(date, symbol, t_type, price, qty, round_num, note):
+    """Transactions 시트에 거래 기록 추가"""
+    client = get_google_sheets_client()
+    ss = client.open(SPREADSHEET_NAME)
+    
+    # 1. 거래 내역 추가
+    ws_trans = ss.worksheet("Transactions")
+    ws_trans.append_row([str(date), symbol.upper(), t_type, price, qty, round_num, note])
+    
+    # 2. 첫 매수(BUY)인 경우, Stocks의 Category를 'Holding'으로 자동 변경
+    if t_type == "BUY":
+        try:
+            ws_stocks = ss.worksheet("Stocks")
+            stocks_data = ws_stocks.get_all_records()
+            df_stocks = pd.DataFrame(stocks_data)
+            
+            # 해당 Symbol이 Stocks에 있는지 확인
+            mask = df_stocks['Symbol'] == symbol.upper()
+            if mask.any():
+                row_idx = df_stocks.index[mask][0] + 2 # 헤더(1) + 0-based index(1)
+                # Category 열이 C열(3번째)이라고 가정 (구조에 따라 확인 필요)
+                # 안전하게 findCell로 찾는 것이 좋으나 여기선 간단히 업데이트 로직 구현
+                # Stocks 구조: Symbol, Name, Category, Strategy...
+                ws_stocks.update_cell(row_idx, 3, "Holding") 
+        except Exception as e:
+            print(f"Category 업데이트 실패: {e}")
+
+    st.cache_data.clear()
+
+# --- 4. 포트폴리오 계산 로직 (React 앱 기능 이식) ---
+def calculate_portfolio(df_stocks, df_trans):
+    portfolio = []
+    
+    if df_stocks.empty:
+        return pd.DataFrame()
+
+    for _, stock in df_stocks.iterrows():
+        symbol = str(stock['Symbol']).strip()
+        name = stock['Name']
+        strategy = stock.get('Strategy', 'Long') # 없으면 기본 Long
+        category = stock.get('Category', 'Interest')
+        target_amt = float(str(stock['TargetAmount']).replace(',','')) if stock['TargetAmount'] else 0
         
-        # 빈 값 처리 (pd.NA를 빈 문자열로 변환)
-        df = df.fillna("")
+        # 해당 종목의 거래 내역 필터링
+        if not df_trans.empty:
+            txs = df_trans[df_trans['Symbol'].astype(str) == symbol]
+        else:
+            txs = pd.DataFrame()
+
+        total_qty = 0
+        total_cost = 0
+        realized_profit = 0
         
-        # 헤더 포함 전체 데이터 준비
-        values = [df.columns.tolist()] + df.values.tolist()
+        if not txs.empty:
+            for _, tx in txs.iterrows():
+                try:
+                    qty = int(str(tx['Quantity']).replace(',',''))
+                    price = float(str(tx['Price']).replace(',',''))
+                    t_type = tx['Type']
+                    
+                    if t_type == 'BUY':
+                        total_cost += price * qty
+                        total_qty += qty
+                    elif t_type == 'SELL':
+                        if total_qty > 0:
+                            avg_price = total_cost / total_qty
+                            profit = (price - avg_price) * qty
+                            realized_profit += profit
+                            total_cost -= avg_price * qty # 평단가 유지 방식
+                            total_qty -= qty
+                except:
+                    continue
+
+        avg_price = total_cost / total_qty if total_qty > 0 else 0
         
-        # 기존 데이터 지우고 새 데이터 쓰기
-        worksheet.clear()
-        worksheet.update(values, value_input_option='USER_ENTERED')
-        
-        # 캐시 무효화 (다음 로드 시 최신 데이터 가져오기)
-        load_stocks.clear()
-        
-    except Exception as e:
-        st.error(f"❌ 데이터 저장 실패: {str(e)}")
-        raise
+        # 현재가 조회 (캐싱 적용 권장)
+        current_price = avg_price # 기본값
+        try:
+            ticker = yf.Ticker(symbol)
+            # 장중 데이터 가져오기 시도
+            todays_data = ticker.history(period='1d')
+            if not todays_data.empty:
+                current_price = todays_data['Close'].iloc[-1]
+        except:
+            pass
+
+        current_val = current_price * total_qty
+        unrealized_profit = current_val - total_cost
+        return_rate = ((current_price - avg_price) / avg_price * 100) if avg_price > 0 else 0
+
+        portfolio.append({
+            "Symbol": symbol,
+            "Name": name,
+            "Strategy": strategy,
+            "Category": category,
+            "Holdings": total_qty,
+            "AvgPrice": avg_price,
+            "CurrentPrice": current_price,
+            "TotalInvested": total_cost,
+            "CurrentValue": current_val,
+            "ReturnRate": return_rate,
+            "UnrealizedProfit": unrealized_profit,
+            "RealizedProfit": realized_profit,
+            "TargetAmount": target_amt
+        })
+
+    return pd.DataFrame(portfolio)
 
 # 주가 데이터 가져오기 (캐싱)
-@st.cache_data(ttl=3600)  # 1시간 캐싱
-def get_stock_data(symbol):
+@st.cache_data(ttl=3600)
+def get_stock_history(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        df = ticker.history(period="max")
-        # 타임존 정보 제거 (yfinance 데이터의 인덱스에 타임존이 포함되어 있어서 제거)
-        if df.index.tz is not None:
-            df.index = df.index.tz_localize(None)
-        # 인덱스를 날짜만 남기고 시간 정보 제거 (정규화)
-        df.index = pd.to_datetime(df.index).normalize()
+        df = ticker.history(period="1y")
         return df
-    except Exception as e:
-        st.error(f"데이터를 가져오는 중 오류가 발생했습니다: {str(e)}")
+    except:
         return None
 
-# 초기화
-init_google_sheet()
+# --- 메인 앱 시작 ---
+df_stocks, df_trans = load_data()
+df_portfolio = calculate_portfolio(df_stocks, df_trans)
 
-# 새 종목 추가 콜백 함수
-def add_stock_callback():
-    """새 종목 추가 폼 제출 시 실행되는 콜백 함수"""
-    # session_state에서 값 가져오기
-    symbol = st.session_state.get("symbol_input", "")
-    name = st.session_state.get("name_input", "")
-    interest_date = st.session_state.get("interest_date_input", None)
-    buy_date = st.session_state.get("buy_date_input", None)
-    sell_date = st.session_state.get("sell_date_input", None)
-    note = st.session_state.get("note_input", "")
-    
-    if symbol and name:
-        df = load_stocks()
-        
-        # 중복 체크: 대소문자 무시, 공백 제거 비교
-        symbol_normalized = symbol.strip().upper()
-        existing_symbols = df['Symbol'].astype(str).str.strip().str.upper()
-        
-        if symbol_normalized in existing_symbols.values:
-            st.session_state["add_result"] = {"type": "error", "message": "이미 등록된 종목입니다."}
-        else:
-            new_row = {
-                "Symbol": symbol_normalized,
-                "Name": name,
-                "InterestDate": interest_date.strftime("%Y-%m-%d") if interest_date else "",
-                "Note": note if note else ""
-            }
-            # BuyDate1~10, SellDate1~10 초기화
-            for i in range(1, 11):
-                new_row[f"BuyDate{i}"] = ""
-                new_row[f"SellDate{i}"] = ""
-            # 첫 번째 매수일/매도일 설정
-            if buy_date:
-                new_row["BuyDate1"] = buy_date.strftime("%Y-%m-%d")
-            if sell_date:
-                new_row["SellDate1"] = sell_date.strftime("%Y-%m-%d")
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            save_stocks(df)
-            
-            # 성공 시 입력값 초기화
-            st.session_state["symbol_input"] = ""
-            st.session_state["name_input"] = ""
-            st.session_state["interest_date_input"] = None
-            st.session_state["buy_date_input"] = None
-            st.session_state["sell_date_input"] = None
-            st.session_state["note_input"] = ""
-            
-            st.session_state["add_result"] = {"type": "success", "message": f"{name} ({symbol}) 종목이 추가되었습니다!", "rerun": True}
-    else:
-        st.session_state["add_result"] = {"type": "error", "message": "티커와 종목명은 필수 입력 항목입니다."}
-
-# 사이드바
+# 사이드바 공통 영역 (로그인/로그아웃 등 필요시 여기에)
 with st.sidebar:
-    st.header("📊 종목 관리")
+    st.header("⚙️ 설정 및 입력")
+    # 여기서 입력 폼을 탭에 따라 다르게 보여줄 수도 있음
     
-    # 새 종목 추가
-    st.subheader("새 종목 추가하기")
-    with st.form("add_stock_form"):
-        symbol = st.text_input("티커 (예: AAPL, 005930.KS)", key="symbol_input")
-        name = st.text_input("종목명", key="name_input")
-        interest_date = st.date_input("관심일", value=None, key="interest_date_input")
-        buy_date = st.date_input("매수일 (선택사항)", value=None, key="buy_date_input")
-        sell_date = st.date_input("매도일 (선택사항)", value=None, key="sell_date_input")
-        note = st.text_area("메모", key="note_input")
-        
-        st.form_submit_button("추가", on_click=add_stock_callback)
+# 탭 구성: 기존 추적기(Chart) vs 주식 관리(Asset)
+tab_tracker, tab_manager = st.tabs(["📈 주식 추적기", "💰 주식 관리 (포트폴리오)"])
+
+# ==========================================
+# 탭 1: 주식 추적기 (기존 기능 유지 + 마커 업그레이드)
+# ==========================================
+with tab_tracker:
+    # 1. 상단 컨트롤 (종목 선택)
+    col1, col2, col3 = st.columns([2, 1, 1])
     
-    # 메시지 출력 처리
-    if "add_result" in st.session_state:
-        result = st.session_state["add_result"]
-        if result["type"] == "success":
-            st.success(result["message"])
-            if result.get("rerun", False):
-                del st.session_state["add_result"]
-                st.rerun()
+    with col1:
+        # DB에 있는 종목 리스트업
+        if not df_portfolio.empty:
+            # 검색 편의를 위해 "이름 (티커)" 형식 사용
+            options = [f"{row['Name']} ({row['Symbol']})" for _, row in df_portfolio.iterrows()]
+            selected_option = st.selectbox("종목 선택", options, key="tracker_select")
+            selected_symbol = selected_option.split("(")[1].replace(")", "")
+            
+            # 선택된 종목 정보 가져오기
+            selected_stock_info = df_portfolio[df_portfolio['Symbol'] == selected_symbol].iloc[0]
         else:
-            st.error(result["message"])
-            del st.session_state["add_result"]
+            st.info("등록된 종목이 없습니다. 사이드바에서 추가해주세요.")
+            selected_symbol = None
+
+    # 2. 종목 추가 (사이드바에 배치)
+    with st.sidebar:
+        with st.expander("➕ 관심 종목 등록 (Stocks)", expanded=False):
+            with st.form("add_stock_form"):
+                st.caption("새로운 종목을 마스터 DB에 등록합니다.")
+                new_symbol = st.text_input("티커 (예: 005930.KS)")
+                new_name = st.text_input("종목명 (예: 삼성전자)")
+                new_strategy = st.selectbox("투자 전략", ["Long", "Short"])
+                new_target = st.number_input("목표 투자금 (원)", min_value=0, step=100000)
+                new_plan = st.number_input("분할 계획 (회)", value=3)
+                new_note = st.text_input("메모")
+                
+                if st.form_submit_button("관심종목 등록"):
+                    if new_symbol and new_name:
+                        add_stock_to_db(new_symbol, new_name, new_strategy, new_target, new_plan, new_note)
+                        st.success(f"{new_name} 등록 완료!")
+                        st.rerun()
+                    else:
+                        st.error("티커와 종목명은 필수입니다.")
+
+    # 3. 차트 및 정보 표시
+    if selected_symbol:
+        st.subheader(f"{selected_stock_info['Name']} ({selected_symbol}) 차트 분석")
+        
+        # 실시간 시세 정보 (메트릭)
+        m_col1, m_col2, m_col3 = st.columns(3)
+        curr_price = selected_stock_info['CurrentPrice']
+        prev_close = 0 # 전일 종가는 yfinance history에서 계산 필요하지만 여기선 생략 또는 추가 구현
+        
+        m_col1.metric("현재가", f"{curr_price:,.0f}원")
+        m_col2.metric("보유 수량", f"{selected_stock_info['Holdings']:,} 주")
+        m_col3.metric("평가 손익", f"{selected_stock_info['UnrealizedProfit']:,.0f}원", f"{selected_stock_info['ReturnRate']:.2f}%")
+
+        # 차트 그리기
+        hist_df = get_stock_history(selected_symbol)
+        
+        if hist_df is not None and not hist_df.empty:
+            fig = go.Figure()
+            
+            # 캔들 차트
+            fig.add_trace(go.Candlestick(
+                x=hist_df.index,
+                open=hist_df['Open'], high=hist_df['High'],
+                low=hist_df['Low'], close=hist_df['Close'],
+                name="주가",
+                increasing_line_color='#ef4444', decreasing_line_color='#3b82f6'
+            ))
+            
+            # ★ 핵심: Transactions 데이터를 기반으로 매수/매도 마커 찍기
+            if not df_trans.empty:
+                # 현재 종목의 거래 내역만 필터링
+                stock_txs = df_trans[df_trans['Symbol'] == selected_symbol]
+                
+                # 매수 마커 (BUY)
+                buys = stock_txs[stock_txs['Type'] == 'BUY']
+                if not buys.empty:
+                    fig.add_trace(go.Scatter(
+                        x=pd.to_datetime(buys['Date']), 
+                        y=buys['Price'],
+                        mode='markers',
+                        marker=dict(symbol='triangle-up', size=12, color='#ef4444', line=dict(width=1, color='white')),
+                        name='매수',
+                        hovertemplate='매수: %{y:,.0f}원<br>수량: %{text}주',
+                        text=buys['Quantity']
+                    ))
+                
+                # 매도 마커 (SELL)
+                sells = stock_txs[stock_txs['Type'] == 'SELL']
+                if not sells.empty:
+                    fig.add_trace(go.Scatter(
+                        x=pd.to_datetime(sells['Date']), 
+                        y=sells['Price'],
+                        mode='markers',
+                        marker=dict(symbol='triangle-down', size=12, color='#3b82f6', line=dict(width=1, color='white')),
+                        name='매도',
+                        hovertemplate='매도: %{y:,.0f}원<br>수량: %{text}주',
+                        text=sells['Quantity']
+                    ))
+
+            fig.update_layout(
+                height=600,
+                xaxis_rangeslider_visible=False,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'),
+                xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
+                yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # 종목 메모 표시
+            # Stocks 시트에 있는 Note 가져오기
+            note = df_stocks[df_stocks['Symbol'] == selected_symbol]['Note'].values[0]
+            if note:
+                st.info(f"📝 메모: {note}")
+        else:
+            st.error("차트 데이터를 불러올 수 없습니다.")
+
+
+# ==========================================
+# 탭 2: 주식 관리 (포트폴리오 & 매매입력)
+# ==========================================
+with tab_manager:
+    # 1. 매매 기록 입력 (사이드바 혹은 상단)
+    with st.sidebar:
+        st.divider()
+        with st.expander("💰 매매 기록 남기기 (Transactions)", expanded=True):
+            with st.form("add_trans_form"):
+                st.caption("실제 거래 내역을 가계부처럼 기록합니다.")
+                # 종목 선택 (티커 자동 입력)
+                if not df_portfolio.empty:
+                    tr_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df_portfolio.iterrows()]
+                    tr_sel = st.selectbox("종목", tr_options)
+                    tr_symbol = tr_sel.split("(")[1].replace(")", "")
+                else:
+                    tr_symbol = st.text_input("티커 직접 입력")
+                
+                tr_date = st.date_input("거래일", datetime.now())
+                tr_type = st.selectbox("유형", ["BUY", "SELL"])
+                tr_price = st.number_input("단가 (원)", min_value=0, step=100)
+                tr_qty = st.number_input("수량 (주)", min_value=1, step=1)
+                tr_round = st.number_input("회차", min_value=1, value=1)
+                tr_note = st.text_input("비고 (예: 물타기)")
+                
+                if st.form_submit_button("거래 기록 저장"):
+                    add_transaction_to_db(tr_date, tr_symbol, tr_type, tr_price, tr_qty, tr_round, tr_note)
+                    st.success("저장되었습니다!")
+                    st.rerun()
+
+    # 2. 필터링 및 요약 대시보드
+    st.title("💰 포트폴리오 현황")
+    
+    # 전략 필터 (Long / Short)
+    strategy_filter = st.radio("투자 전략 필터", ["전체", "Long (중장기)", "Short (단타)"], horizontal=True)
+    
+    # 필터링된 데이터프레임
+    if strategy_filter == "Long (중장기)":
+        filtered_pf = df_portfolio[df_portfolio['Strategy'] == 'Long']
+    elif strategy_filter == "Short (단타)":
+        filtered_pf = df_portfolio[df_portfolio['Strategy'] == 'Short']
+    else:
+        filtered_pf = df_portfolio
+
+    # 보유 중인 종목만 보기 (옵션)
+    show_only_holding = st.checkbox("보유 중인 종목만 보기", value=True)
+    if show_only_holding:
+        filtered_pf = filtered_pf[filtered_pf['Holdings'] > 0]
+
+    if not filtered_pf.empty:
+        # 요약 메트릭
+        total_invested = filtered_pf['TotalInvested'].sum()
+        total_val = filtered_pf['CurrentValue'].sum()
+        total_pf_profit = total_val - total_invested
+        total_pf_roi = (total_pf_profit / total_invested * 100) if total_invested > 0 else 0
+        total_realized = filtered_pf['RealizedProfit'].sum()
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("총 매입금액", f"{total_invested:,.0f}원")
+        col2.metric("총 평가금액", f"{total_val:,.0f}원")
+        col3.metric("총 평가손익", f"{total_pf_profit:,.0f}원", f"{total_pf_roi:.2f}%")
+        col4.metric("실현 수익 (익절/손절)", f"{total_realized:,.0f}원", delta_color="off")
+        
+        st.divider()
+
+        # 차트와 테이블
+        c1, c2 = st.columns([1, 2])
+        
+        with c1:
+            st.subheader("📊 자산 비중")
+            if total_val > 0:
+                fig_donut = px.pie(filtered_pf, values='CurrentValue', names='Name', hole=0.4,
+                                   color_discrete_sequence=px.colors.qualitative.Plotly)
+                fig_donut.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), 
+                                      paper_bgcolor='rgba(0,0,0,0)', font=dict(color='white'))
+                fig_donut.update_traces(textinfo='percent+label', textposition='inside')
+                st.plotly_chart(fig_donut, use_container_width=True)
+            else:
+                st.info("자산이 없습니다.")
+
+        with c2:
+            st.subheader("📋 상세 보유 현황")
+            # 보여줄 컬럼 선택 및 정렬
+            display_cols = ['Name', 'Symbol', 'Strategy', 'Holdings', 'AvgPrice', 'CurrentPrice', 'ReturnRate', 'CurrentValue', 'RealizedProfit']
+            display_df = filtered_pf[display_cols].sort_values(by='CurrentValue', ascending=False)
+            
+            # 컬럼명 한글화
+            display_df.columns = ['종목명', '티커', '전략', '보유수량', '평단가', '현재가', '수익률', '평가액', '실현손익']
+            
+            # 스타일링하여 표시
+            st.dataframe(
+                display_df.style.format({
+                    '보유수량': "{:,}",
+                    '평단가': "{:,.0f}",
+                    '현재가': "{:,.0f}",
+                    '평가액': "{:,.0f}",
+                    '실현손익': "{:,.0f}",
+                    '수익률': "{:.2f}%"
+                }).background_gradient(subset=['수익률'], cmap='RdYlGn', vmin=-10, vmax=10),
+                use_container_width=True,
+                height=400
+            )
+
+    else:
+        st.info("해당 조건의 종목이 없습니다.")
     
     st.divider()
     
-    # 종목 삭제
-    st.subheader("종목 삭제하기")
-    df = load_stocks()
-    if not df.empty:
-        delete_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df.iterrows()]
-        # 가나다순 정렬
-        delete_options = sorted(delete_options)
-        selected_delete = st.selectbox("삭제할 종목 선택", delete_options, key="delete_select")
+    # 3. 상세 거래 내역 (Ledger) 조회
+    st.subheader("📝 종목별 거래 내역 조회")
+    if not df_portfolio.empty:
+        ledger_stock = st.selectbox("내역을 확인할 종목 선택", df_portfolio['Name'] + " (" + df_portfolio['Symbol'] + ")", key="ledger_select")
+        ledger_symbol = ledger_stock.split("(")[1].replace(")", "")
         
-        if st.button("삭제", key="delete_button"):
-            # 정렬된 리스트에서 선택된 항목의 Symbol 추출
-            # 형식: "Name (Symbol)"
-            selected_symbol = selected_delete.split("(")[1].rstrip(")")
-            # 원본 df에서 해당 Symbol로 찾기
-            mask = df['Symbol'] == selected_symbol
-            deleted_name = df.loc[mask, 'Name'].values[0] if mask.any() else selected_delete.split("(")[0].strip()
-            df = df[~mask].reset_index(drop=True)
-            save_stocks(df)
-            st.success(f"{deleted_name} 종목이 삭제되었습니다!")
-            st.rerun()
-    else:
-        st.info("저장된 종목이 없습니다.")
-
-# 메인 화면
-st.title("📈 나만의 주식 추적기")
-
-df = load_stocks()
-
-if df.empty:
-    st.info("사이드바에서 종목을 추가해주세요.")
-else:
-    # 상단 컨트롤 바 (5단 구성)
-    col1, col2, col3, col4, col5 = st.columns([1, 1.5, 0.8, 0.8, 1])
-    
-    with col1:
-        # 카테고리 선택 (매수종목 / 관심종목)
-        category = st.radio(
-            "카테고리",
-            options=["전체", "매수종목", "관심종목"],
-            index=0,
-            key="category_select",
-            horizontal=True
-        )
-    
-    with col2:
-        # 종목 선택
-        stock_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df.iterrows()]
-        
-        # 카테고리 필터링
-        if category == "매수종목":
-            filtered_options = []
-            for idx, row in df.iterrows():
-                # BuyDate1~10 중 하나라도 있으면 매수종목
-                has_buy_date = False
-                for i in range(1, 11):
-                    if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
-                        has_buy_date = True
-                        break
-                if has_buy_date:
-                    filtered_options.append(f"{row['Name']} ({row['Symbol']})")
-            if filtered_options:
-                stock_options = filtered_options
-        elif category == "관심종목":
-            filtered_options = []
-            for idx, row in df.iterrows():
-                # BuyDate1~10이 모두 비어있고 InterestDate가 있으면 관심종목
-                has_buy_date = False
-                for i in range(1, 11):
-                    if pd.notna(row.get(f'BuyDate{i}', '')) and str(row.get(f'BuyDate{i}', '')).strip() != "":
-                        has_buy_date = True
-                        break
-                if not has_buy_date and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
-                    filtered_options.append(f"{row['Name']} ({row['Symbol']})")
-            if filtered_options:
-                stock_options = filtered_options
-        
-        # 가나다순 정렬
-        stock_options = sorted(stock_options)
-        
-        selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
-    
-    with col3:
-        # 시작일
-        start_date = st.date_input(
-            "시작일",
-            value=None,
-            key="start_date"
-        )
-    
-    with col4:
-        # 종료일
-        end_date = st.date_input(
-            "종료일",
-            value=None,
-            key="end_date"
-        )
-    
-    with col5:
-        # 기간선택 박스
-        period_options = {
-            "6개월": 0.5,
-            "1년": 1,
-            "5년": 5,
-            "10년": 10,
-            "15년": 15
-        }
-        selected_period = st.selectbox(
-            "기간선택",
-            options=["선택안함"] + list(period_options.keys()),
-            index=0,
-            key="period_select"
-        )
-    
-    if selected_stock:
-        # 원본 df에서 선택된 종목 찾기
-        selected_name_symbol = selected_stock
-        selected_row = None
-        for idx, row in df.iterrows():
-            if f"{row['Name']} ({row['Symbol']})" == selected_name_symbol:
-                selected_row = row
-                break
-        
-        if selected_row is not None:
-            symbol = selected_row['Symbol']
-            name = selected_row['Name']
-            interest_date = selected_row.get('InterestDate', '')
-            note = selected_row.get('Note', '')
-            
-            # BuyDate1~10, SellDate1~10 읽기
-            buy_dates = []
-            sell_dates = []
-            for i in range(1, 11):
-                buy_date_val = selected_row.get(f'BuyDate{i}', '')
-                if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
-                    buy_dates.append(str(buy_date_val).strip())
-                else:
-                    buy_dates.append("")
-                sell_date_val = selected_row.get(f'SellDate{i}', '')
-                if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
-                    sell_dates.append(str(sell_date_val).strip())
-                else:
-                    sell_dates.append("")
-            
-            # 정보 수정하기 (상단 컨트롤 바 아래 별도 영역)
-            with st.container():
-                st.markdown("""
-                <style>
-                .edit-container {
-                    background: rgba(255, 255, 255, 0.05);
-                    backdrop-filter: blur(10px);
-                    border-radius: 15px;
-                    padding: 1.5rem;
-                    margin: 1rem 0;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                }
-                /* 정보 수정하기 Expander - 노란색 계열 (부드러운 노란색) */
-                /* JavaScript로 동적 스타일 적용 */
-                <script>
-                function styleEditExpander() {
-                    const expanders = document.querySelectorAll('[data-testid="stExpander"]');
-                    expanders.forEach(expander => {
-                        const header = expander.querySelector('.streamlit-expanderHeader');
-                        if (header && header.textContent.includes('정보 수정하기')) {
-                            header.style.background = 'linear-gradient(135deg, #FFF9C4 0%, #FFE082 100%)';
-                            header.style.border = '2px solid #FFD54F';
-                            header.style.borderRadius = '15px';
-                            header.style.boxShadow = '0 4px 15px rgba(255, 213, 79, 0.3)';
-                            header.style.color = '#5D4037';
-                            header.style.fontWeight = '700';
-                            const headerText = header.querySelectorAll('*');
-                            headerText.forEach(el => {
-                                if (el.tagName !== 'svg') {
-                                    el.style.color = '#5D4037';
-                                }
-                            });
-                            const content = expander.querySelector('[data-testid="stExpanderContent"]');
-                            if (content) {
-                                content.style.background = 'rgba(255, 249, 196, 0.4)';
-                                content.style.borderRadius = '0 0 15px 15px';
-                                content.style.padding = '1rem';
-                                content.style.border = '1px solid rgba(255, 213, 79, 0.3)';
-                            }
-                        }
-                    });
-                }
-                // 페이지 로드 시 및 DOM 변경 시 실행
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', styleEditExpander);
-                } else {
-                    styleEditExpander();
-                }
-                // Streamlit의 동적 업데이트를 감지
-                const observer = new MutationObserver(styleEditExpander);
-                observer.observe(document.body, { childList: true, subtree: true });
-                </script>
-                </style>
-                """, unsafe_allow_html=True)
-                with st.expander("📝 정보 수정하기", expanded=False):
-                    # 날짜 데이터 변환 (문자열 -> date 객체)
-                    def parse_date(date_str):
-                        if pd.notna(date_str) and date_str != "":
-                            try:
-                                return pd.to_datetime(date_str).date()
-                            except:
-                                return None
-                        return None
-                    
-                    edit_interest_date = st.date_input(
-                        "관심일",
-                        value=parse_date(interest_date),
-                        key=f"edit_interest_date_{symbol}"
-                    )
-                    
-                    # 매수일 입력 (동적 추가)
-                    st.write("**매수일**")
-                    buy_date_inputs = []
-                    buy_date_count = len([d for d in buy_dates if d != ""]) or 1
-                    if buy_date_count == 0:
-                        buy_date_count = 1
-                    
-                    # 세션 상태로 매수일 개수 관리
-                    if f'buy_date_count_{symbol}' not in st.session_state:
-                        st.session_state[f'buy_date_count_{symbol}'] = max(buy_date_count, 1)
-                    
-                    for i in range(st.session_state[f'buy_date_count_{symbol}']):
-                        col_date, col_delete = st.columns([4, 1])
-                        with col_date:
-                            buy_date_inputs.append(st.date_input(
-                                f"매수일 {i+1}",
-                                value=parse_date(buy_dates[i]) if i < len(buy_dates) else None,
-                                key=f"edit_buy_date_{i}_{symbol}",
-                                label_visibility="collapsed"
-                            ))
-                        with col_delete:
-                            if st.button("🗑️", key=f"delete_buy_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                # 즉시 CSV에서 해당 날짜 삭제
-                                df_stocks = load_stocks()
-                                mask = df_stocks['Symbol'] == symbol
-                                if mask.any():
-                                    # i는 0부터 시작하므로 BuyDate{i+1}에 해당
-                                    date_idx = i + 1
-                                    # 해당 인덱스의 BuyDate를 None으로 명시적 할당
-                                    df_stocks.loc[mask, f'BuyDate{date_idx}'] = None
-                                    # 뒤의 날짜들을 앞으로 이동
-                                    for j in range(date_idx, 10):
-                                        next_val = df_stocks.loc[mask, f'BuyDate{j+1}'].values[0] if mask.any() else None
-                                        if pd.notna(next_val) and str(next_val).strip() != "":
-                                            df_stocks.loc[mask, f'BuyDate{j}'] = str(next_val).strip()
-                                        else:
-                                            df_stocks.loc[mask, f'BuyDate{j}'] = ""
-                                    df_stocks.loc[mask, 'BuyDate10'] = ""
-                                    # 즉시 저장
-                                    save_stocks(df_stocks)
-                                    st.success("삭제되었습니다!")
-                                    # 0.5초 대기
-                                    time.sleep(0.5)
-                                # 개수 조정
-                                if st.session_state[f'buy_date_count_{symbol}'] > 0:
-                                    st.session_state[f'buy_date_count_{symbol}'] -= 1
-                                if st.session_state[f'buy_date_count_{symbol}'] == 0:
-                                    st.session_state[f'buy_date_count_{symbol}'] = 1
-                                st.rerun()
-                    
-                    # 매수일 추가 버튼
-                    if st.button("➕ 매수일 추가", key=f"add_buy_date_{symbol}"):
-                        if st.session_state[f'buy_date_count_{symbol}'] < 10:
-                            st.session_state[f'buy_date_count_{symbol}'] += 1
-                            st.rerun()
-                        else:
-                            st.warning("최대 10개까지 추가 가능합니다.")
-                    
-                    # 매도일 입력 (동적 추가)
-                    st.write("**매도일**")
-                    sell_date_inputs = []
-                    sell_date_count = len([d for d in sell_dates if d != ""]) or 1
-                    if sell_date_count == 0:
-                        sell_date_count = 1
-                    
-                    # 세션 상태로 매도일 개수 관리
-                    if f'sell_date_count_{symbol}' not in st.session_state:
-                        st.session_state[f'sell_date_count_{symbol}'] = max(sell_date_count, 1)
-                    
-                    for i in range(st.session_state[f'sell_date_count_{symbol}']):
-                        col_date, col_delete = st.columns([4, 1])
-                        with col_date:
-                            sell_date_inputs.append(st.date_input(
-                                f"매도일 {i+1}",
-                                value=parse_date(sell_dates[i]) if i < len(sell_dates) else None,
-                                key=f"edit_sell_date_{i}_{symbol}",
-                                label_visibility="collapsed"
-                            ))
-                        with col_delete:
-                            if st.button("🗑️", key=f"delete_sell_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                # 즉시 CSV에서 해당 날짜 삭제
-                                df_stocks = load_stocks()
-                                mask = df_stocks['Symbol'] == symbol
-                                if mask.any():
-                                    # i는 0부터 시작하므로 SellDate{i+1}에 해당
-                                    date_idx = i + 1
-                                    # 해당 인덱스의 SellDate를 None으로 명시적 할당
-                                    df_stocks.loc[mask, f'SellDate{date_idx}'] = None
-                                    # 뒤의 날짜들을 앞으로 이동
-                                    for j in range(date_idx, 10):
-                                        next_val = df_stocks.loc[mask, f'SellDate{j+1}'].values[0] if mask.any() else None
-                                        if pd.notna(next_val) and str(next_val).strip() != "":
-                                            df_stocks.loc[mask, f'SellDate{j}'] = str(next_val).strip()
-                                        else:
-                                            df_stocks.loc[mask, f'SellDate{j}'] = ""
-                                    df_stocks.loc[mask, 'SellDate10'] = ""
-                                    # 즉시 저장
-                                    save_stocks(df_stocks)
-                                    st.success("삭제되었습니다!")
-                                    # 0.5초 대기
-                                    time.sleep(0.5)
-                                # 개수 조정
-                                if st.session_state[f'sell_date_count_{symbol}'] > 0:
-                                    st.session_state[f'sell_date_count_{symbol}'] -= 1
-                                if st.session_state[f'sell_date_count_{symbol}'] == 0:
-                                    st.session_state[f'sell_date_count_{symbol}'] = 1
-                                st.rerun()
-                    
-                    # 매도일 추가 버튼
-                    if st.button("➕ 매도일 추가", key=f"add_sell_date_{symbol}"):
-                        if st.session_state[f'sell_date_count_{symbol}'] < 10:
-                            st.session_state[f'sell_date_count_{symbol}'] += 1
-                            st.rerun()
-                        else:
-                            st.warning("최대 10개까지 추가 가능합니다.")
-                    
-                    edit_note = st.text_area(
-                        "메모",
-                        value=note if pd.notna(note) else "",
-                        key=f"edit_note_{symbol}"
-                    )
-                    
-                    edit_submitted = st.button("수정 저장", key="edit_submit_button")
-                    
-                    if edit_submitted:
-                        df_stocks = load_stocks()
-                        # Symbol 기준으로 해당 종목 찾아서 업데이트
-                        mask = df_stocks['Symbol'] == symbol
-                        if mask.any():
-                            df_stocks.loc[mask, 'InterestDate'] = edit_interest_date.strftime("%Y-%m-%d") if edit_interest_date else ""
-                            # BuyDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
-                            buy_dates_to_save = [d for d in buy_date_inputs if d is not None]
-                            for i in range(1, 11):
-                                if i <= len(buy_dates_to_save):
-                                    df_stocks.loc[mask, f'BuyDate{i}'] = buy_dates_to_save[i-1].strftime("%Y-%m-%d")
-                                else:
-                                    df_stocks.loc[mask, f'BuyDate{i}'] = ""
-                            # SellDate1~10 저장 (None인 날짜는 빈 값으로, 순서대로 저장)
-                            sell_dates_to_save = [d for d in sell_date_inputs if d is not None]
-                            for i in range(1, 11):
-                                if i <= len(sell_dates_to_save):
-                                    df_stocks.loc[mask, f'SellDate{i}'] = sell_dates_to_save[i-1].strftime("%Y-%m-%d")
-                                else:
-                                    df_stocks.loc[mask, f'SellDate{i}'] = ""
-                            df_stocks.loc[mask, 'Note'] = edit_note if edit_note else ""
-                            save_stocks(df_stocks)
-                            st.success("수정되었습니다!")
-                            st.rerun()
-            
-            # 주가 데이터 가져오기
-            with st.spinner(f"{name} ({symbol}) 데이터를 불러오는 중..."):
-                stock_data_full = get_stock_data(symbol)
-            
-            if stock_data_full is not None and not stock_data_full.empty:
-                # 기간선택 박스로 시작일/종료일 자동 설정
-                if selected_period and selected_period != "선택안함":
-                    period_years = period_options[selected_period]
-                    max_date = stock_data_full.index.max()
-                    min_date = max_date - timedelta(days=int(period_years * 365))
-                    # 기간선택 시 시작일/종료일 자동 계산
-                    calculated_start_date = min_date.date()
-                    calculated_end_date = max_date.date()
-                else:
-                    calculated_start_date = start_date
-                    calculated_end_date = end_date
-                
-                # 시작일/종료일에 맞춰 데이터 필터링
-                stock_data = stock_data_full.copy()
-                
-                # 기간선택이 있으면 계산된 날짜 사용, 없으면 사용자 입력 날짜 사용
-                filter_start_date = calculated_start_date if (selected_period and selected_period != "선택안함") else start_date
-                filter_end_date = calculated_end_date if (selected_period and selected_period != "선택안함") else end_date
-                
-                if filter_start_date is not None:
-                    start_dt = pd.to_datetime(filter_start_date).normalize()
-                    stock_data = stock_data[stock_data.index >= start_dt].copy()
-                
-                if filter_end_date is not None:
-                    end_dt = pd.to_datetime(filter_end_date).normalize()
-                    stock_data = stock_data[stock_data.index <= end_dt].copy()
-                
-                # 시작일/종료일이 모두 없으면 기본 5년
-                if filter_start_date is None and filter_end_date is None:
-                    cutoff_date = stock_data_full.index.max() - timedelta(days=5 * 365)
-                    stock_data = stock_data_full[stock_data_full.index >= cutoff_date].copy()
-                
-                # 캔들스틱 차트 생성
-                fig = go.Figure()
-                
-                # 캔들스틱 차트 추가 (한국 스타일 색상)
-                fig.add_trace(go.Candlestick(
-                    x=stock_data.index,
-                    open=stock_data['Open'],
-                    high=stock_data['High'],
-                    low=stock_data['Low'],
-                    close=stock_data['Close'],
-                    name="주가",
-                    increasing=dict(
-                        line=dict(color='#FF2E2E'),  # 상승: 빨강
-                        fillcolor='#FF2E2E'
-                    ),
-                    decreasing=dict(
-                        line=dict(color='#00C4FF'),  # 하락: 파랑
-                        fillcolor='#00C4FF'
-                    )
-                ))
-                
-                # 날짜별 주석 추가
-                annotations = []
-                sell_dates = []
-                sell_prices = []
-                
-                # 날짜 문자열을 datetime으로 변환하고 정규화하는 함수
-                def parse_date_safe(date_str):
-                    if pd.isna(date_str) or date_str == "" or str(date_str).strip() == "":
-                        return None
-                    try:
-                        # 문자열을 datetime으로 변환하고 날짜만 남기기 (시간 정보 제거)
-                        date_dt = pd.to_datetime(date_str).normalize()
-                        return date_dt
-                    except Exception as e:
-                        return None
-                
-                # 날짜에 해당하는 마커를 찾는 함수 (주말/휴장일이면 다음 거래일 사용)
-                def find_trading_date(target_date, data_index):
-                    """
-                    target_date에 해당하는 거래일을 찾습니다.
-                    주말/휴장일이면 다음 거래일(bfill)을 반환합니다.
-                    """
-                    if len(data_index) == 0:
-                        return None
-                    
-                    # 정규화된 날짜로 변환
-                    target_date = pd.to_datetime(target_date).normalize()
-                    
-                    # 정확히 일치하는 날짜가 있는지 확인
-                    if target_date in data_index:
-                        return target_date
-                    
-                    # 정확히 일치하지 않으면 다음 거래일 찾기 (bfill)
-                    # target_date 이후의 데이터만 필터링
-                    future_dates = data_index[data_index >= target_date]
-                    if len(future_dates) > 0:
-                        # 다음 거래일 반환
-                        return future_dates[0]
-                    
-                    # target_date 이전의 가장 가까운 날짜 찾기 (fallback)
-                    past_dates = data_index[data_index <= target_date]
-                    if len(past_dates) > 0:
-                        return past_dates[-1]
-                    
-                    return None
-                
-                # 관심일 표시 (네온 노란색 화살표 - 아래 방향)
-                interest_dt = parse_date_safe(interest_date)
-                if interest_dt is not None:
-                    try:
-                        if len(stock_data.index) > 0:
-                            # 거래일 찾기
-                            trading_date = find_trading_date(interest_dt, stock_data.index)
-                            if trading_date is not None and trading_date in stock_data.index:
-                                price = stock_data.loc[trading_date, 'High']
-                                # 가격 범위 계산 (텍스트 위치)
-                                price_range = stock_data['High'].max() - stock_data['Low'].min()
-                                offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
-                                text_y = price + offset  # 텍스트 위치
-                                annotations.append(dict(
-                                    x=trading_date,
-                                    y=text_y,  # 텍스트는 위에
-                                    xref="x",
-                                    yref="y",
-                                    text="👀 관심",
-                                    showarrow=True,
-                                    arrowhead=2,
-                                    arrowcolor="#FFD700",  # 네온 노란색
-                                    arrowsize=1.5,
-                                    arrowwidth=2,
-                                    ax=0,
-                                    ay=-70,  # 고정값: 위로 70픽셀
-                                    bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
-                                    bordercolor="#FFD700",
-                                    borderwidth=2,
-                                    font=dict(size=14, color="#FFD700")  # 텍스트 크기 증가
-                                ))
-                    except Exception as e:
-                        pass
-                
-                # 매수일 표시 (네온 빨간색 화살표 - 위 방향) - 여러 개 표시
-                for i in range(1, 11):
-                    buy_date_val = selected_row.get(f'BuyDate{i}', '')
-                    if pd.notna(buy_date_val) and str(buy_date_val).strip() != "":
-                        buy_dt = parse_date_safe(buy_date_val)
-                        if buy_dt is not None:
-                            try:
-                                if len(stock_data.index) > 0:
-                                    trading_date = find_trading_date(buy_dt, stock_data.index)
-                                    if trading_date is not None and trading_date in stock_data.index:
-                                        price = stock_data.loc[trading_date, 'Low']
-                                        # 가격 범위 계산 (텍스트 위치)
-                                        price_range = stock_data['High'].max() - stock_data['Low'].min()
-                                        offset = price_range * 0.01  # 가격 범위의 1%만큼 아래로
-                                        text_y = price - offset  # 텍스트 위치
-                                        text_label = "🔴 매수" if i == 1 else f"🔴 매수{i}"
-                                        annotations.append(dict(
-                                            x=trading_date,
-                                            y=text_y,  # 텍스트는 아래에
-                                            xref="x",
-                                            yref="y",
-                                            text=text_label,
-                                            showarrow=True,
-                                            arrowhead=2,
-                                            arrowcolor="#FF2E2E",  # 네온 빨간색
-                                            arrowsize=1.5,
-                                            arrowwidth=2,
-                                            ax=0,
-                                            ay=70,  # 고정값: 아래로 70픽셀
-                                            bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
-                                            bordercolor="#FF2E2E",
-                                            borderwidth=2,
-                                            font=dict(size=14, color="#FF2E2E")  # 텍스트 크기 증가
-                                        ))
-                            except Exception as e:
-                                pass
-                
-                # 매도일 표시 (네온 하늘색 화살표 - 아래 방향) - 여러 개 표시
-                for i in range(1, 11):
-                    sell_date_val = selected_row.get(f'SellDate{i}', '')
-                    if pd.notna(sell_date_val) and str(sell_date_val).strip() != "":
-                        sell_dt = parse_date_safe(sell_date_val)
-                        if sell_dt is not None:
-                            try:
-                                if len(stock_data.index) > 0:
-                                    trading_date = find_trading_date(sell_dt, stock_data.index)
-                                    if trading_date is not None and trading_date in stock_data.index:
-                                        price = stock_data.loc[trading_date, 'High']
-                                        # 가격 범위 계산 (텍스트 위치)
-                                        price_range = stock_data['High'].max() - stock_data['Low'].min()
-                                        offset = price_range * 0.01  # 가격 범위의 1%만큼 위로
-                                        text_y = price + offset  # 텍스트 위치
-                                        sell_dates.append(trading_date)
-                                        sell_prices.append(price)
-                                        text_label = "🔵 매도" if i == 1 else f"🔵 매도{i}"
-                                        annotations.append(dict(
-                                            x=trading_date,
-                                            y=text_y,  # 텍스트는 위에
-                                            xref="x",
-                                            yref="y",
-                                            text=text_label,
-                                            showarrow=True,  # 화살표 추가
-                                            arrowhead=2,
-                                            arrowcolor="#00C4FF",  # 네온 하늘색
-                                            arrowsize=1.5,
-                                            arrowwidth=2,
-                                            ax=0,
-                                            ay=-70,  # 고정값: 위로 70픽셀
-                                            bgcolor="rgba(0, 0, 0, 0.5)",  # 반투명 검정 배경
-                                            bordercolor="#00C4FF",
-                                            borderwidth=2,
-                                            font=dict(size=14, color="#00C4FF"),  # 텍스트 크기 증가
-                                            yshift=10
-                                        ))
-                            except Exception as e:
-                                pass
-                
-                # 매도일 점 마커 추가 (네온 하늘색)
-                if sell_dates:
-                    fig.add_trace(go.Scatter(
-                        x=sell_dates,
-                        y=sell_prices,
-                        mode='markers',
-                        marker=dict(
-                            symbol='circle',
-                            size=18,  # 크기 증가
-                            color='#00C4FF',  # 네온 하늘색
-                            line=dict(width=2, color='#0088CC')
-                        ),
-                        name="매도",
-                        hovertemplate="매도일: %{x}<br>가격: %{y}<extra></extra>"
-                    ))
-                
-                # 레이아웃 설정 (모던 핀테크 스타일)
-                fig.update_layout(
-                    title=dict(
-                        text=f"{name} ({symbol}) 주가 차트",
-                        font=dict(size=20, color='#ffffff', family='Pretendard'),
-                        x=0.5,
-                        xanchor='center'
-                    ),
-                    xaxis=dict(
-                        title=dict(
-                            text="날짜",
-                            font=dict(color='#e5e7eb', size=14, family='Pretendard')
-                        ),
-                        tickfont=dict(color='#9ca3af', size=12),
-                        gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
-                        gridwidth=1,
-                        showgrid=True,
-                        zeroline=False,
-                        linecolor='rgba(255, 255, 255, 0.1)',
-                        linewidth=1
-                    ),
-                    yaxis=dict(
-                        title=dict(
-                            text="가격",
-                            font=dict(color='#e5e7eb', size=14, family='Pretendard')
-                        ),
-                        tickfont=dict(color='#9ca3af', size=12),
-                        gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
-                        gridwidth=1,
-                        showgrid=True,
-                        zeroline=False,
-                        linecolor='rgba(255, 255, 255, 0.1)',
-                        linewidth=1
-                    ),
-                    xaxis_rangeslider_visible=False,
-                    height=600,
-                    annotations=annotations,
-                    hovermode='x unified',
-                    dragmode='zoom',
-                    plot_bgcolor='rgba(0, 0, 0, 0)',
-                    paper_bgcolor='rgba(0, 0, 0, 0)',
-                    font=dict(family='Pretendard', color='#e5e7eb'),
-                    legend=dict(
-                        bgcolor='rgba(0, 0, 0, 0)',
-                        bordercolor='rgba(255, 255, 255, 0.1)',
-                        borderwidth=1,
-                        font=dict(color='#e5e7eb', size=12)
-                    )
-                )
-                
-                # 차트 표시 (확대/축소 버튼 포함, 마우스 휠 줌 활성화)
-                st.plotly_chart(fig, use_container_width=True, config={
-                    'modeBarButtonsToAdd': ['zoomIn2d', 'zoomOut2d', 'resetScale2d', 'pan2d'],
-                    'displayModeBar': True,
-                    'displaylogo': False,
-                    'scrollZoom': True,  # 마우스 휠 줌 활성화
-                    'toImageButtonOptions': {
-                        'format': 'png',
-                        'filename': f'{name}_{symbol}_chart',
-                        'height': 600,
-                        'width': 1200,
-                        'scale': 1
-                    }
-                })
-                
-                # 메모 표시
-                if pd.notna(note) and note != "":
-                    st.info(f"**메모:** {note}")
-                else:
-                    st.info("메모가 없습니다.")
+        # Transactions에서 해당 종목 필터링
+        if not df_trans.empty:
+            my_ledger = df_trans[df_trans['Symbol'] == ledger_symbol].sort_values(by='Date', ascending=False)
+            if not my_ledger.empty:
+                st.dataframe(my_ledger, use_container_width=True)
             else:
-                st.error(f"{symbol} 종목의 데이터를 가져올 수 없습니다. 티커를 확인해주세요.")
-
+                st.info("거래 내역이 없습니다.")
