@@ -1653,21 +1653,23 @@ with tab2:
                 badges_html += f"""
                 <button 
                     id="badge_btn_{stock_id}"
+                    class="stock-badge-btn"
+                    data-stock-id="{stock_id}"
+                    data-progress="{progress_pct}"
                     onclick="handleBadgeClick('{stock_id}')"
                     style="
-                        background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%) !important;
-                        background-image: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%) !important;
-                        border: 2px solid {dark_green} !important;
-                        border-radius: 12px !important;
-                        padding: 0.8rem 1.5rem !important;
-                        color: #ffffff !important;
-                        font-weight: 600 !important;
-                        font-size: 0.95rem !important;
-                        cursor: pointer !important;
-                        transition: all 0.3s !important;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
-                        font-family: 'Pretendard', sans-serif !important;
-                        min-width: 120px !important;
+                        background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%);
+                        border: 2px solid {dark_green};
+                        border-radius: 12px;
+                        padding: 0.8rem 1.5rem;
+                        color: #ffffff;
+                        font-weight: 600;
+                        font-size: 0.95rem;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                        font-family: 'Pretendard', sans-serif;
+                        min-width: 120px;
                     "
                     onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
                     onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
@@ -1677,23 +1679,70 @@ with tab2:
                 """
             
             badges_html += '</div>'
+            st.markdown(badges_html, unsafe_allow_html=True)
+            
+            # JavaScript로 강제 스타일 적용 (페이지 로드 후 실행)
+            js_apply_styles = f"""
+            <script>
+            (function() {{
+                const darkGreen = '{dark_green}';
+                const lightGreen = '{light_green}';
+                
+                function applyBadgeStyles() {{
+                    const badges = document.querySelectorAll('.stock-badge-btn, [id^="badge_btn_"]');
+                    console.log('뱃지 버튼 찾음:', badges.length);
+                    
+                    badges.forEach(btn => {{
+                        const progress = parseFloat(btn.getAttribute('data-progress')) || 0;
+                        const progressPct = Math.min(100, Math.max(0, progress));
+                        
+                        // 인라인 스타일로 강제 적용
+                        btn.style.setProperty('background', `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progressPct}}%, ${{lightGreen}} ${{progressPct}}%, ${{lightGreen}} 100%)`, 'important');
+                        btn.style.setProperty('background-image', `linear-gradient(to right, ${{darkGreen}} 0%, ${{darkGreen}} ${{progressPct}}%, ${{lightGreen}} ${{progressPct}}%, ${{lightGreen}} 100%)`, 'important');
+                        btn.style.setProperty('border', `2px solid ${{darkGreen}}`, 'important');
+                        btn.style.setProperty('border-radius', '12px', 'important');
+                        btn.style.setProperty('color', '#ffffff', 'important');
+                        btn.style.setProperty('font-weight', '600', 'important');
+                        
+                        console.log('뱃지 스타일 적용:', btn.id, '진행률:', progressPct + '%');
+                    }});
+                }}
+                
+                // 즉시 실행
+                applyBadgeStyles();
+                
+                // DOM 변경 감지 (MutationObserver)
+                const observer = new MutationObserver(function(mutations) {{
+                    applyBadgeStyles();
+                }});
+                
+                observer.observe(document.body, {{
+                    childList: true,
+                    subtree: true
+                }});
+                
+                // 여러 번 시도 (Streamlit이 동적으로 로드하는 경우 대비)
+                setTimeout(applyBadgeStyles, 100);
+                setTimeout(applyBadgeStyles, 500);
+                setTimeout(applyBadgeStyles, 1000);
+                setTimeout(applyBadgeStyles, 2000);
+            }})();
+            </script>
+            """
+            st.markdown(js_apply_styles, unsafe_allow_html=True)
             
             # 디버깅 정보 표시 (옵션)
             with st.expander("🔍 디버깅 정보 (클릭하여 확인)", expanded=False):
                 st.write("**뱃지 정보:**")
                 for stock_data in sorted_stocks[:5]:  # 처음 5개만 표시
                     st.write(f"- {stock_data['name']}: 진행률 {stock_data['progress']:.2f}%")
-            
-            st.markdown(badges_html, unsafe_allow_html=True)
-            
-            # 추가 CSS로 강제 적용
-            st.markdown(f"""
-            <style>
-            button[id^="badge_btn_"] {{
-                background: linear-gradient(to right, {dark_green} var(--progress, 0%), {light_green} var(--progress, 0%)) !important;
-            }}
-            </style>
-            """, unsafe_allow_html=True)
+                st.code("""
+                브라우저 Console에서 확인:
+                1. F12 키 누르기
+                2. Console 탭 선택
+                3. "뱃지 버튼 찾음" 메시지 확인
+                4. "뱃지 스타일 적용" 메시지 확인
+                """)
             
             # JavaScript로 클릭 이벤트 처리
             st.markdown("""
@@ -1797,9 +1846,12 @@ with tab2:
                     badges_html_2 += f"""
                     <button 
                         id="badge_btn_{stock_id}_2"
+                        class="stock-badge-btn"
+                        data-stock-id="{stock_id}"
+                        data-progress="{progress_pct}"
                         onclick="handleBadgeClick('{stock_id}')"
                         style="
-                            background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%);
+                            background: linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%);
                             border: 2px solid {dark_green};
                             border-radius: 12px;
                             padding: 0.8rem 1.5rem;
@@ -1810,6 +1862,7 @@ with tab2:
                             transition: all 0.3s;
                             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                             font-family: 'Pretendard', sans-serif;
+                            min-width: 120px;
                         "
                         onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
                         onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
