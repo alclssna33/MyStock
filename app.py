@@ -1631,151 +1631,168 @@ with tab2:
             # 뱃지들을 그리드로 표시
             sorted_stocks = sorted(portfolio_data, key=lambda x: x['totalInvested'], reverse=True)
             num_cols = min(9, len(sorted_stocks))
-            badge_cols = st.columns(num_cols)
             
             # 모든 뱃지 스타일을 한 번에 정의
             light_green = "#86efac"  # 연한 초록색
             dark_green = "#10b981"    # 진한 초록색
             
-            badge_styles = ""
-            for idx, stock_data in enumerate(sorted_stocks):
-                progress = stock_data['progress']
-                stock_id = stock_data['id']
-                progress_pct = min(100, max(0, progress))
-                
-                # 더 강력한 CSS 선택자 사용
-                badge_styles += f"""
-                div[data-testid="stButton"] > button[key="badge_{stock_id}"],
-                button[key="badge_{stock_id}"] {{
-                    background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                    background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                    border: 2px solid {dark_green} !important;
-                    border-radius: 12px !important;
-                    color: #ffffff !important;
-                    font-weight: 600 !important;
-                    box-shadow: none !important;
-                }}
-                div[data-testid="stButton"] > button[key="badge_{stock_id}"]:hover,
-                button[key="badge_{stock_id}"]:hover {{
-                    background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                    background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                    transform: scale(1.05);
-                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
-                }}
-                """
-            
-            # CSS를 먼저 적용
-            st.markdown(f"""
-            <style>
-            {badge_styles}
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # JavaScript로 동적 스타일 적용 (CSS가 적용되지 않는 경우 대비)
-            js_code = "<script>"
-            for idx, stock_data in enumerate(sorted_stocks):
-                progress = stock_data['progress']
-                stock_id = stock_data['id']
-                progress_pct = min(100, max(0, progress))
-                js_code += f"""
-                setTimeout(function() {{
-                    const btn = document.querySelector('button[key="badge_{stock_id}"]');
-                    if (btn) {{
-                        btn.style.background = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
-                        btn.style.backgroundImage = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
-                        btn.style.border = '2px solid {dark_green}';
-                        btn.style.borderRadius = '12px';
-                        btn.style.color = '#ffffff';
-                        btn.style.fontWeight = '600';
-                    }}
-                }}, 100);
-                """
-            js_code += "</script>"
-            st.markdown(js_code, unsafe_allow_html=True)
+            # HTML 버튼으로 뱃지 생성
+            badges_html = '<div style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem;">'
             
             for idx, stock_data in enumerate(sorted_stocks):
                 name = stock_data['name']
                 progress = stock_data['progress']
                 stock_id = stock_data['id']
-                col_idx = idx % num_cols
+                progress_pct = min(100, max(0, progress))
                 
-                with badge_cols[col_idx]:
-                    # 뱃지 버튼 (클릭 시 해당 종목 expander 열기 및 스크롤 이동)
-                    if st.button(name, key=f"badge_{stock_id}", use_container_width=True):
+                badges_html += f"""
+                <button 
+                    id="badge_btn_{stock_id}"
+                    onclick="window.parent.postMessage({{type: 'badge_click', stock_id: '{stock_id}'}}, '*')"
+                    style="
+                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%);
+                        border: 2px solid {dark_green};
+                        border-radius: 12px;
+                        padding: 0.8rem 1.5rem;
+                        color: #ffffff;
+                        font-weight: 600;
+                        font-size: 0.95rem;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                        font-family: 'Pretendard', sans-serif;
+                    "
+                    onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
+                    onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
+                >
+                    {name}
+                </button>
+                """
+            
+            badges_html += '</div>'
+            st.markdown(badges_html, unsafe_allow_html=True)
+            
+            # JavaScript로 클릭 이벤트 처리 - Streamlit 버튼 클릭 시뮬레이션
+            st.markdown("""
+            <script>
+            function handleBadgeClick(stockId) {
+                // Streamlit 버튼 찾기 및 클릭
+                const streamlitDoc = window.parent;
+                const buttons = streamlitDoc.querySelectorAll('button[data-testid*="baseButton"]');
+                let clicked = false;
+                
+                buttons.forEach(btn => {
+                    const key = btn.getAttribute('key');
+                    if (key && key === 'badge_click_' + stockId) {
+                        btn.click();
+                        clicked = true;
+                    }
+                });
+                
+                // 버튼을 찾지 못한 경우 직접 expander 열기
+                if (!clicked) {
+                    setTimeout(function() {
+                        const expanders = streamlitDoc.querySelectorAll('[data-testid="stExpander"]');
+                        expanders.forEach(expander => {
+                            const summary = expander.querySelector('summary');
+                            const details = expander.querySelector('[data-testid="stExpanderDetails"]');
+                            if (summary && details) {
+                                const text = details.textContent || '';
+                                // 종목명으로 찾기 (더 정확한 방법 필요)
+                                if (!expander.hasAttribute('open')) {
+                                    summary.click();
+                                }
+                                expander.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        });
+                    }, 200);
+                }
+            }
+            
+            // 페이지 로드 후 이벤트 리스너 추가
+            setTimeout(function() {
+                document.querySelectorAll('[id^="badge_btn_"]').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const stockId = this.id.replace('badge_btn_', '').replace('_2', '');
+                        handleBadgeClick(stockId);
+                    });
+                });
+            }, 500);
+            </script>
+            """, unsafe_allow_html=True)
+            
+            # Streamlit 버튼으로 클릭 이벤트 처리 (숨김)
+            for stock_data in sorted_stocks:
+                stock_id = stock_data['id']
+                if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
+                    st.session_state[f"expand_{stock_id}"] = True
+                    st.session_state[f"scroll_to_{stock_id}"] = True
+                    st.rerun()
+            
+            # 두 번째 줄 버튼도 생성
+            if len(sorted_stocks) > num_cols:
+                for stock_data in sorted_stocks[num_cols:]:
+                    stock_id = stock_data['id']
+                    if st.button("", key=f"badge_click_{stock_id}", help="", use_container_width=False):
                         st.session_state[f"expand_{stock_id}"] = True
                         st.session_state[f"scroll_to_{stock_id}"] = True
                         st.rerun()
             
+            # 숨겨진 버튼 스타일
+            st.markdown("""
+            <style>
+            button[key^="badge_click_"] {
+                display: none !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                height: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                position: absolute !important;
+                left: -9999px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             # 두 번째 줄 뱃지 (필요한 경우)
             if len(sorted_stocks) > num_cols:
                 remaining_stocks = sorted_stocks[num_cols:]
-                remaining_cols = st.columns(min(9, len(remaining_stocks)))
                 
-                # 두 번째 줄 뱃지 스타일 정의
-                badge_styles_2 = ""
-                for idx, stock_data in enumerate(remaining_stocks):
-                    progress = stock_data['progress']
-                    stock_id = stock_data['id']
-                    progress_pct = min(100, max(0, progress))
-                    
-                    badge_styles_2 += f"""
-                    div[data-testid="stButton"] > button[key="badge_{stock_id}_2"],
-                    button[key="badge_{stock_id}_2"] {{
-                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                        background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                        border: 2px solid {dark_green} !important;
-                        border-radius: 12px !important;
-                        color: #ffffff !important;
-                        font-weight: 600 !important;
-                        box-shadow: none !important;
-                    }}
-                    div[data-testid="stButton"] > button[key="badge_{stock_id}_2"]:hover,
-                    button[key="badge_{stock_id}_2"]:hover {{
-                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                        background-image: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
-                        transform: scale(1.05);
-                        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2) !important;
-                    }}
-                    """
-                
-                st.markdown(f"""
-                <style>
-                {badge_styles_2}
-                </style>
-                """, unsafe_allow_html=True)
-                
-                # 두 번째 줄 JavaScript 스타일 적용
-                js_code_2 = "<script>"
-                for idx, stock_data in enumerate(remaining_stocks):
-                    progress = stock_data['progress']
-                    stock_id = stock_data['id']
-                    progress_pct = min(100, max(0, progress))
-                    js_code_2 += f"""
-                    setTimeout(function() {{
-                        const btn = document.querySelector('button[key="badge_{stock_id}_2"]');
-                        if (btn) {{
-                            btn.style.background = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
-                            btn.style.backgroundImage = 'linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%)';
-                            btn.style.border = '2px solid {dark_green}';
-                            btn.style.borderRadius = '12px';
-                            btn.style.color = '#ffffff';
-                            btn.style.fontWeight = '600';
-                        }}
-                    }}, 100);
-                    """
-                js_code_2 += "</script>"
-                st.markdown(js_code_2, unsafe_allow_html=True)
+                badges_html_2 = '<div style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem;">'
                 
                 for idx, stock_data in enumerate(remaining_stocks):
                     name = stock_data['name']
+                    progress = stock_data['progress']
                     stock_id = stock_data['id']
-                    col_idx = idx % len(remaining_cols)
+                    progress_pct = min(100, max(0, progress))
                     
-                    with remaining_cols[col_idx]:
-                        if st.button(name, key=f"badge_{stock_id}_2", use_container_width=True):
-                            st.session_state[f"expand_{stock_id}"] = True
-                            st.session_state[f"scroll_to_{stock_id}"] = True
-                            st.rerun()
+                    badges_html_2 += f"""
+                    <button 
+                        id="badge_btn_{stock_id}_2"
+                        onclick="handleBadgeClick('{stock_id}')"
+                        style="
+                            background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%);
+                            border: 2px solid {dark_green};
+                            border-radius: 12px;
+                            padding: 0.8rem 1.5rem;
+                            color: #ffffff;
+                            font-weight: 600;
+                            font-size: 0.95rem;
+                            cursor: pointer;
+                            transition: all 0.3s;
+                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                            font-family: 'Pretendard', sans-serif;
+                        "
+                        onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 12px rgba(0, 0, 0, 0.2)';"
+                        onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)';"
+                    >
+                        {name}
+                    </button>
+                    """
+                
+                badges_html_2 += '</div>'
+                st.markdown(badges_html_2, unsafe_allow_html=True)
         
         # 전체 현황판 (드롭다운 기능 포함)
         if portfolio_data:
