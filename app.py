@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
+import plotly.express as px
 import os
 import time
 import json
@@ -281,6 +282,63 @@ def get_stock_data(symbol):
         st.error(f"데이터를 가져오는 중 오류가 발생했습니다: {str(e)}")
         return None
 
+# ==========================================
+# 분할 매수 플래너 관련 함수들
+# ==========================================
+
+# 분할 매수 플래너 데이터 로드
+@st.cache_data(ttl=60)
+def load_split_purchase_data():
+    """SplitPurchasePlanner 시트에서 데이터를 로드합니다."""
+    try:
+        client = get_google_sheets_client()
+        spreadsheet = client.open(SPREADSHEET_NAME)
+        
+        try:
+            ws = spreadsheet.worksheet("SplitPurchasePlanner")
+            records = ws.get_all_records()
+            
+            if not records:
+                return pd.DataFrame(columns=["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+            
+            df = pd.DataFrame(records)
+            return df
+        except gspread.WorksheetNotFound:
+            # 워크시트가 없으면 생성
+            ws = spreadsheet.add_worksheet(title="SplitPurchasePlanner", rows=1000, cols=10)
+            headers = ["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"]
+            ws.append_row(headers)
+            return pd.DataFrame(columns=headers)
+    except Exception as e:
+        st.error(f"❌ 분할 매수 데이터 로드 실패: {str(e)}")
+        return pd.DataFrame(columns=["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+
+# 분할 매수 플래너 데이터 저장
+def save_split_purchase_data(df):
+    """SplitPurchasePlanner 시트에 데이터를 저장합니다."""
+    try:
+        client = get_google_sheets_client()
+        spreadsheet = client.open(SPREADSHEET_NAME)
+        ws = spreadsheet.worksheet("SplitPurchasePlanner")
+        
+        # JSON 컬럼을 문자열로 변환
+        df = df.copy()
+        if 'BuyTransactions' in df.columns:
+            df['BuyTransactions'] = df['BuyTransactions'].apply(lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]'))
+        if 'SellTransactions' in df.columns:
+            df['SellTransactions'] = df['SellTransactions'].apply(lambda x: json.dumps(x) if isinstance(x, list) else (x if x else '[]'))
+        
+        df = df.fillna("")
+        values = [df.columns.tolist()] + df.values.tolist()
+        
+        ws.clear()
+        ws.update(values, value_input_option='USER_ENTERED')
+        
+        load_split_purchase_data.clear()
+    except Exception as e:
+        st.error(f"❌ 분할 매수 데이터 저장 실패: {str(e)}")
+        raise
+
 # 초기화
 init_google_sheet()
 
@@ -388,10 +446,14 @@ with st.sidebar:
     else:
         st.info("저장된 종목이 없습니다.")
 
-# 메인 화면
-st.title("📈 나만의 주식 추적기")
+# 메인 화면 - 탭 구조
+tab1, tab2 = st.tabs(["📈 주식 추적기", "💰 분할 매수 플래너"])
 
-df = load_stocks()
+# 탭 1: 주식 추적기
+with tab1:
+    st.title("📈 나만의 주식 추적기")
+    
+    df = load_stocks()
 
 if df.empty:
     st.info("사이드바에서 종목을 추가해주세요.")
@@ -1031,3 +1093,345 @@ else:
                     st.info("메모가 없습니다.")
             else:
                 st.error(f"{symbol} 종목의 데이터를 가져올 수 없습니다. 티커를 확인해주세요.")
+
+# 탭 2: 분할 매수 플래너
+with tab2:
+    st.title("💰 주식 분할 매수 플래너")
+    
+    # 데이터 로드
+    df_split = load_split_purchase_data()
+    
+    # JSON 파싱
+    if not df_split.empty:
+        if 'BuyTransactions' in df_split.columns:
+            df_split['BuyTransactions'] = df_split['BuyTransactions'].apply(
+                lambda x: json.loads(x) if isinstance(x, str) and x and x != '[]' else []
+            )
+        if 'SellTransactions' in df_split.columns:
+            df_split['SellTransactions'] = df_split['SellTransactions'].apply(
+                lambda x: json.loads(x) if isinstance(x, str) and x and x != '[]' else []
+            )
+    
+    # ==========================================
+    # 1. 포트폴리오 요약
+    # ==========================================
+    st.subheader("📊 포트폴리오 요약")
+    
+    if df_split.empty:
+        st.info("추가된 종목이 없습니다.")
+    else:
+        # 포트폴리오 계산
+        portfolio_data = []
+        total_invested = 0
+        total_budget = 0
+        
+        for _, stock in df_split.iterrows():
+            buy_txs = stock.get('BuyTransactions', []) if isinstance(stock.get('BuyTransactions'), list) else []
+            sell_txs = stock.get('SellTransactions', []) if isinstance(stock.get('SellTransactions'), list) else []
+            
+            # 매수 총액 계산
+            buy_cost = 0
+            buy_qty = 0
+            for tx in buy_txs:
+                if tx and isinstance(tx, dict):
+                    buy_cost += tx.get('price', 0) * tx.get('quantity', 0)
+                    buy_qty += tx.get('quantity', 0)
+            
+            # 매도 수량 계산
+            sell_qty = sum(tx.get('quantity', 0) for tx in sell_txs if isinstance(tx, dict))
+            
+            avg_price = buy_cost / buy_qty if buy_qty > 0 else 0
+            current_qty = buy_qty - sell_qty
+            current_invested = current_qty * avg_price
+            
+            max_investment = stock.get('MarketCap', 0) / 10000
+            progress = (current_invested / max_investment * 100) if max_investment > 0 else 0
+            
+            portfolio_data.append({
+                'id': stock.get('ID', ''),
+                'name': stock.get('Name', ''),
+                'totalInvested': current_invested,
+                'progress': progress,
+                'maxInvestment': max_investment
+            })
+            
+            total_invested += current_invested
+            total_budget += max_investment
+        
+        overall_progress = (total_invested / total_budget * 100) if total_budget > 0 else 0
+        
+        # 요약 메트릭
+        col1, col2, col3 = st.columns(3)
+        col1.metric("총 예산", f"{total_budget:,.0f}원")
+        col2.metric("총 매입금액", f"{total_invested:,.0f}원")
+        col3.metric("진행률", f"{overall_progress:.2f}%")
+        
+        # 도넛 차트
+        if total_invested > 0:
+            colors = px.colors.qualitative.Plotly
+            chart_df = pd.DataFrame(portfolio_data)
+            chart_df = chart_df[chart_df['totalInvested'] > 0].sort_values('totalInvested', ascending=False)
+            
+            if not chart_df.empty:
+                fig_donut = px.pie(
+                    chart_df,
+                    values='totalInvested',
+                    names='name',
+                    hole=0.4,
+                    color_discrete_sequence=colors
+                )
+                fig_donut.update_layout(
+                    title="전체 총 매입금액",
+                    showlegend=True,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white'),
+                    height=400
+                )
+                fig_donut.update_traces(textinfo='percent+label', textposition='inside')
+                st.plotly_chart(fig_donut, use_container_width=True)
+        
+        # 포트폴리오 테이블
+        if portfolio_data:
+            display_df = pd.DataFrame(portfolio_data)
+            display_df = display_df.sort_values('totalInvested', ascending=False)
+            display_df['percentage'] = (display_df['totalInvested'] / total_invested * 100) if total_invested > 0 else 0
+            
+            st.dataframe(
+                display_df[['name', 'totalInvested', 'progress', 'percentage']].rename(columns={
+                    'name': '종목명',
+                    'totalInvested': '현재 매입금액',
+                    'progress': '매수 진행률 (%)',
+                    'percentage': '비중 (%)'
+                }).style.format({
+                    '현재 매입금액': '{:,.0f}',
+                    '매수 진행률 (%)': '{:.2f}',
+                    '비중 (%)': '{:.1f}'
+                }),
+                use_container_width=True
+            )
+    
+    st.divider()
+    
+    # ==========================================
+    # 2. 데이터 관리
+    # ==========================================
+    st.subheader("📁 데이터 관리")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ 데이터 초기화", type="secondary", key="reset_split_data"):
+            if st.session_state.get('confirm_reset_split', False):
+                df_split = pd.DataFrame(columns=["ID", "Name", "MarketCap", "Installments", "BuyTransactions", "SellTransactions"])
+                save_split_purchase_data(df_split)
+                st.success("데이터가 초기화되었습니다!")
+                st.session_state['confirm_reset_split'] = False
+                st.rerun()
+            else:
+                st.session_state['confirm_reset_split'] = True
+                st.warning("⚠️ 다시 클릭하면 모든 데이터가 삭제됩니다!")
+    
+    st.divider()
+    
+    # ==========================================
+    # 3. 새 종목 추가
+    # ==========================================
+    with st.expander("➕ 새 종목 추가", expanded=False):
+        with st.form("add_split_stock_form"):
+            name = st.text_input("종목명", placeholder="예: 삼성전자")
+            market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000")
+            installments = st.number_input("분할 횟수", min_value=1, value=3)
+            
+            if st.form_submit_button("계획 추가"):
+                if name and market_cap > 0:
+                    new_id = f"{datetime.now().timestamp()}-{len(df_split)}"
+                    new_row = {
+                        "ID": new_id,
+                        "Name": name,
+                        "MarketCap": market_cap * 100000000,  # 억원을 원으로 변환
+                        "Installments": int(installments),
+                        "BuyTransactions": json.dumps([]),
+                        "SellTransactions": json.dumps([])
+                    }
+                    df_split = pd.concat([df_split, pd.DataFrame([new_row])], ignore_index=True)
+                    save_split_purchase_data(df_split)
+                    st.success(f"{name} 종목이 추가되었습니다!")
+                    st.rerun()
+                else:
+                    st.error("종목명과 시가총액을 입력해주세요.")
+    
+    st.divider()
+    
+    # ==========================================
+    # 4. 종목별 카드 표시
+    # ==========================================
+    if not df_split.empty:
+        st.subheader("📦 종목별 상세 관리")
+        
+        for idx, stock in df_split.iterrows():
+            stock_id = stock.get('ID', '')
+            stock_name = stock.get('Name', '')
+            market_cap = stock.get('MarketCap', 0)
+            installments = stock.get('Installments', 3)
+            buy_txs = stock.get('BuyTransactions', []) if isinstance(stock.get('BuyTransactions'), list) else []
+            sell_txs = stock.get('SellTransactions', []) if isinstance(stock.get('SellTransactions'), list) else []
+            
+            # 거래 데이터 파싱
+            if isinstance(buy_txs, str):
+                try:
+                    buy_txs = json.loads(buy_txs) if buy_txs and buy_txs != '[]' else []
+                except:
+                    buy_txs = []
+            if isinstance(sell_txs, str):
+                try:
+                    sell_txs = json.loads(sell_txs) if sell_txs and sell_txs != '[]' else []
+                except:
+                    sell_txs = []
+            
+            max_investment = market_cap / 10000
+            amount_per_installment = max_investment / installments if installments > 0 else 0
+            
+            # 투자 현황 계산
+            total_buy_cost = 0
+            total_buy_qty = 0
+            for tx in buy_txs:
+                if isinstance(tx, dict):
+                    total_buy_cost += tx.get('price', 0) * tx.get('quantity', 0)
+                    total_buy_qty += tx.get('quantity', 0)
+            
+            total_sell_qty = sum(tx.get('quantity', 0) for tx in sell_txs if isinstance(tx, dict))
+            avg_price = total_buy_cost / total_buy_qty if total_buy_qty > 0 else 0
+            current_qty = total_buy_qty - total_sell_qty
+            current_invested = current_qty * avg_price
+            progress = (current_invested / max_investment * 100) if max_investment > 0 else 0
+            
+            # 실현 손익 계산
+            total_realized_profit = 0
+            for tx in sell_txs:
+                if isinstance(tx, dict) and avg_price > 0:
+                    profit = (tx.get('price', 0) - avg_price) * tx.get('quantity', 0)
+                    total_realized_profit += profit
+            
+            # 종목 카드
+            with st.expander(f"📊 {stock_name}", expanded=False):
+                # 요약 정보
+                col1, col2, col3, col4, col5 = st.columns(5)
+                col1.metric("최대 매수 가능액", f"{max_investment:,.0f}원")
+                col2.metric("총 매입금액", f"{current_invested:,.0f}원")
+                col3.metric("매입 평단가", f"{avg_price:,.0f}원")
+                col4.metric("보유 수량", f"{current_qty:,} 주")
+                col5.metric("분할 횟수", f"{installments}회")
+                
+                # 진행률
+                st.progress(progress / 100)
+                col_prog1, col_prog2 = st.columns(2)
+                col_prog1.write(f"**매수 진행률: {progress:.2f}%**")
+                col_prog2.write(f"**총 실현손익: {total_realized_profit:,.0f}원**")
+                
+                st.divider()
+                
+                # 매수 계획 및 기록
+                col_buy, col_sell = st.columns(2)
+                
+                with col_buy:
+                    st.subheader("매수 계획 및 기록")
+                    
+                    # 매수 테이블
+                    buy_data = []
+                    for i in range(installments):
+                        tx = buy_txs[i] if i < len(buy_txs) else None
+                        estimated_qty = int(amount_per_installment / tx.get('price', 1)) if tx and tx.get('price', 0) > 0 else 0
+                        buy_data.append({
+                            '회차': i + 1,
+                            '날짜': tx.get('date', '') if tx else '',
+                            '목표액': f"{amount_per_installment:,.0f}원",
+                            '매수가': tx.get('price', '') if tx else '',
+                            '예상': f"{estimated_qty:,}" if estimated_qty > 0 else '-',
+                            '매수량': tx.get('quantity', '') if tx else ''
+                        })
+                    
+                    buy_df = pd.DataFrame(buy_data)
+                    st.dataframe(buy_df, use_container_width=True, hide_index=True)
+                    
+                    # 매수 기록 입력
+                    with st.form(f"buy_form_{stock_id}"):
+                        st.caption(f"{stock_name} 매수 기록")
+                        buy_round = st.number_input("회차", min_value=1, max_value=installments, value=1, key=f"buy_round_{stock_id}")
+                        buy_date = st.date_input("날짜", datetime.now(), key=f"buy_date_{stock_id}")
+                        buy_price = st.number_input("매수가 (원)", min_value=0, step=100, key=f"buy_price_{stock_id}")
+                        buy_qty = st.number_input("매수량 (주)", min_value=1, step=1, key=f"buy_qty_{stock_id}")
+                        
+                        if st.form_submit_button("기록"):
+                            # buy_txs 리스트 확장
+                            while len(buy_txs) < installments:
+                                buy_txs.append(None)
+                            
+                            buy_txs[buy_round - 1] = {
+                                'date': str(buy_date),
+                                'price': float(buy_price),
+                                'quantity': int(buy_qty)
+                            }
+                            
+                            df_split.at[idx, 'BuyTransactions'] = json.dumps(buy_txs)
+                            save_split_purchase_data(df_split)
+                            st.success("매수 기록이 저장되었습니다!")
+                            st.rerun()
+                
+                with col_sell:
+                    st.subheader("분할 매도 기록")
+                    
+                    # 매도 기록 입력
+                    with st.form(f"sell_form_{stock_id}"):
+                        st.caption(f"{stock_name} 매도 기록")
+                        sell_date = st.date_input("날짜", datetime.now(), key=f"sell_date_{stock_id}")
+                        sell_price = st.number_input("매도가 (원)", min_value=0, step=100, key=f"sell_price_{stock_id}")
+                        sell_qty = st.number_input("매도 수량 (주)", min_value=1, step=1, key=f"sell_qty_{stock_id}")
+                        
+                        if st.form_submit_button("추가"):
+                            new_sell = {
+                                'id': f"{datetime.now().timestamp()}",
+                                'date': str(sell_date),
+                                'price': float(sell_price),
+                                'quantity': int(sell_qty)
+                            }
+                            sell_txs.append(new_sell)
+                            df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
+                            save_split_purchase_data(df_split)
+                            st.success("매도 기록이 저장되었습니다!")
+                            st.rerun()
+                    
+                    # 매도 테이블
+                    if sell_txs:
+                        sell_data = []
+                        for i, tx in enumerate(sell_txs):
+                            if isinstance(tx, dict):
+                                profit = (tx.get('price', 0) - avg_price) * tx.get('quantity', 0) if avg_price > 0 else 0
+                                yield_pct = ((tx.get('price', 0) - avg_price) / avg_price * 100) if avg_price > 0 else 0
+                                
+                                sell_data.append({
+                                    '회차': i + 1,
+                                    '날짜': tx.get('date', ''),
+                                    '매도가': f"{tx.get('price', 0):,.0f}",
+                                    '수량': tx.get('quantity', 0),
+                                    '수익률': f"{yield_pct:.2f}%",
+                                    '수익금': f"{profit:,.0f}"
+                                })
+                        
+                        if sell_data:
+                            sell_df = pd.DataFrame(sell_data)
+                            st.dataframe(sell_df, use_container_width=True, hide_index=True)
+                            
+                            # 삭제 버튼
+                            for i, tx in enumerate(sell_txs):
+                                if st.button(f"🗑️ 삭제", key=f"delete_sell_{stock_id}_{i}"):
+                                    sell_txs.pop(i)
+                                    df_split.at[idx, 'SellTransactions'] = json.dumps(sell_txs)
+                                    save_split_purchase_data(df_split)
+                                    st.rerun()
+                    else:
+                        st.info("매도 기록이 없습니다.")
+                
+                # 종목 삭제
+                if st.button(f"🗑️ {stock_name} 삭제", key=f"delete_stock_{stock_id}", type="secondary"):
+                    df_split = df_split.drop(idx).reset_index(drop=True)
+                    save_split_purchase_data(df_split)
+                    st.success(f"{stock_name}이(가) 삭제되었습니다!")
+                    st.rerun()
