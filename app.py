@@ -1660,30 +1660,25 @@ with tab2:
                 progress = stock_data['progress']
                 stock_id = stock_data['id']
                 
-                # 진행률에 따른 그라데이션 색상
-                if progress >= 100:
-                    gradient_start = "#10b981"  # 초록
-                elif progress >= 50:
-                    gradient_start = "#3b82f6"  # 파랑
-                else:
-                    gradient_start = "#6366f1"  # 보라
-                
-                # 진행률에 따른 그라데이션 적용
+                # 진행률에 따른 그라데이션: 전체 배경은 연한 초록색, 매수한 %만큼만 진한 초록색
+                light_green = "#86efac"  # 연한 초록색
+                dark_green = "#10b981"    # 진한 초록색
                 progress_pct = min(100, max(0, progress))
                 col_idx = idx % num_cols
                 
                 with badge_cols[col_idx]:
-                    # 뱃지 버튼 (클릭 시 해당 종목 expander 열기)
+                    # 뱃지 버튼 (클릭 시 해당 종목 expander 열기 및 스크롤 이동)
                     if st.button(name, key=f"badge_{stock_id}", use_container_width=True):
                         st.session_state[f"expand_{stock_id}"] = True
+                        st.session_state[f"scroll_to_{stock_id}"] = True
                         st.rerun()
                     
-                    # 뱃지 스타일 적용 (CSS 인라인)
+                    # 뱃지 스타일 적용: 전체 배경 연한 초록, 진행률만큼 진한 초록
                     st.markdown(f"""
                     <style>
                     button[key="badge_{stock_id}"] {{
-                        background: linear-gradient(135deg, {gradient_start} {progress_pct}%, rgba(55, 65, 81, 0.5) {progress_pct}%) !important;
-                        border: 2px solid {gradient_start} !important;
+                        background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                        border: 2px solid {dark_green} !important;
                         border-radius: 12px !important;
                         color: #ffffff !important;
                         font-weight: 600 !important;
@@ -1700,26 +1695,22 @@ with tab2:
                     progress = stock_data['progress']
                     stock_id = stock_data['id']
                     
-                    if progress >= 100:
-                        gradient_start = "#10b981"
-                    elif progress >= 50:
-                        gradient_start = "#3b82f6"
-                    else:
-                        gradient_start = "#6366f1"
-                    
+                    light_green = "#86efac"
+                    dark_green = "#10b981"
                     progress_pct = min(100, max(0, progress))
                     col_idx = idx % len(remaining_cols)
                     
                     with remaining_cols[col_idx]:
                         if st.button(name, key=f"badge_{stock_id}_2", use_container_width=True):
                             st.session_state[f"expand_{stock_id}"] = True
+                            st.session_state[f"scroll_to_{stock_id}"] = True
                             st.rerun()
                         
                         st.markdown(f"""
                         <style>
                         button[key="badge_{stock_id}_2"] {{
-                            background: linear-gradient(135deg, {gradient_start} {progress_pct}%, rgba(55, 65, 81, 0.5) {progress_pct}%) !important;
-                            border: 2px solid {gradient_start} !important;
+                            background: linear-gradient(90deg, {dark_green} {progress_pct}%, {light_green} {progress_pct}%) !important;
+                            border: 2px solid {dark_green} !important;
                             border-radius: 12px !important;
                             color: #ffffff !important;
                             font-weight: 600 !important;
@@ -1729,131 +1720,202 @@ with tab2:
         
         # 전체 현황판 (드롭다운 기능 포함)
         if portfolio_data:
-            st.markdown("### 전체 현황판")
+            # 정렬 상태 관리
+            if 'portfolio_sort_col' not in st.session_state:
+                st.session_state['portfolio_sort_col'] = 'totalInvested'
+            if 'portfolio_sort_asc' not in st.session_state:
+                st.session_state['portfolio_sort_asc'] = False
+            if 'portfolio_table_expanded' not in st.session_state:
+                st.session_state['portfolio_table_expanded'] = True
+            
             display_df = pd.DataFrame(portfolio_data)
-            display_df = display_df.sort_values('totalInvested', ascending=False)
             display_df['percentage'] = (display_df['totalInvested'] / total_invested * 100) if total_invested > 0 else 0
             
-            # 드롭다운으로 정렬 옵션 선택
-            sort_options = {
-                "매입금액 높은 순": "totalInvested",
-                "매입금액 낮은 순": "totalInvested_asc",
-                "진행률 높은 순": "progress",
-                "진행률 낮은 순": "progress_asc",
-                "비중 높은 순": "percentage",
-                "비중 낮은 순": "percentage_asc"
-            }
-            selected_sort = st.selectbox("정렬 기준", list(sort_options.keys()), key="portfolio_sort")
+            # 정렬 적용
+            display_df = display_df.sort_values(
+                st.session_state['portfolio_sort_col'], 
+                ascending=st.session_state['portfolio_sort_asc']
+            )
             
-            sort_col = sort_options[selected_sort]
-            if sort_col.endswith("_asc"):
-                ascending = True
-                sort_col = sort_col.replace("_asc", "")
-            else:
-                ascending = False
+            # 드롭다운으로 테이블 접기/펼치기
+            with st.expander("### 전체 현황판", expanded=st.session_state['portfolio_table_expanded']):
+                # expander가 열려있을 때만 테이블 표시
+                if st.session_state['portfolio_table_expanded']:
             
-            display_df = display_df.sort_values(sort_col, ascending=ascending)
-            
-            # 커스텀 테이블 스타일
-            st.markdown("""
-            <style>
-            .portfolio-table {
-                background: rgba(30, 41, 59, 0.5);
-                border-radius: 10px;
-                padding: 1rem;
-                margin-top: 1rem;
-            }
-            .portfolio-table-header {
-                display: grid;
-                grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
-                gap: 1rem;
-                padding: 1rem;
-                background: rgba(99, 102, 241, 0.2);
-                border-radius: 8px;
-                margin-bottom: 0.5rem;
-                font-weight: 600;
-                color: #ffffff;
-            }
-            .portfolio-table-row {
-                display: grid;
-                grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
-                gap: 1rem;
-                padding: 0.8rem 1rem;
-                background: rgba(30, 41, 59, 0.3);
-                border-radius: 6px;
-                margin-bottom: 0.3rem;
-                align-items: center;
-                transition: background 0.2s;
-            }
-            .portfolio-table-row:hover {
-                background: rgba(99, 102, 241, 0.2);
-            }
-            .progress-bar-container {
-                width: 100%;
-                height: 24px;
-                background: rgba(55, 65, 81, 0.5);
-                border-radius: 12px;
-                overflow: hidden;
-                position: relative;
-            }
-            .progress-bar-fill {
-                height: 100%;
-                background: linear-gradient(90deg, #3b82f6, #60a5fa);
-                border-radius: 12px;
-                transition: width 0.3s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #ffffff;
-                font-weight: 600;
-                font-size: 0.85rem;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # 테이블 헤더
-            st.markdown("""
-            <div class="portfolio-table">
-                <div class="portfolio-table-header">
-                    <div style="text-align: center;">#</div>
-                    <div>종목명</div>
-                    <div>현재 매입금액 (% 비중)</div>
-                    <div>매수 진행률</div>
-                    <div style="text-align: center;">비중</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # 테이블 행
-            for row_idx, (_, row) in enumerate(display_df.iterrows()):
-                name = row['name']
-                invested = row['totalInvested']
-                progress = row['progress']
-                percentage = row['percentage']
-                
-                # 진행률에 따른 색상
-                if progress >= 100:
-                    progress_color = "#10b981"
-                elif progress >= 50:
-                    progress_color = "#3b82f6"
-                else:
-                    progress_color = "#6366f1"
-                
-                st.markdown(f"""
-                <div class="portfolio-table-row">
-                    <div style="text-align: center; color: #9ca3af;">{row_idx + 1}</div>
-                    <div style="color: #ffffff; font-weight: 500;">{name}</div>
-                    <div style="color: #ffffff;">₩{invested:,.0f} ({percentage:.1f}%)</div>
-                    <div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill" style="width: {min(100, max(0, progress))}%; background: linear-gradient(90deg, {progress_color}, {progress_color}dd);">
-                                {progress:.2f}%
+                    # 커스텀 테이블 스타일
+                    st.markdown("""
+                    <style>
+                    .portfolio-table {
+                        background: rgba(30, 41, 59, 0.5);
+                        border-radius: 10px;
+                        padding: 1rem;
+                        margin-top: 1rem;
+                    }
+                    .portfolio-table-header {
+                        display: grid;
+                        grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
+                        gap: 1rem;
+                        padding: 1rem;
+                        background: rgba(99, 102, 241, 0.2);
+                        border-radius: 8px;
+                        margin-bottom: 0.5rem;
+                        font-weight: 600;
+                        color: #ffffff;
+                    }
+                    .portfolio-table-header-cell {
+                        cursor: pointer;
+                        user-select: none;
+                        transition: background 0.2s;
+                        padding: 0.3rem;
+                        border-radius: 4px;
+                    }
+                    .portfolio-table-header-cell:hover {
+                        background: rgba(99, 102, 241, 0.3);
+                    }
+                    .portfolio-table-row {
+                        display: grid;
+                        grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
+                        gap: 1rem;
+                        padding: 0.8rem 1rem;
+                        background: rgba(30, 41, 59, 0.3);
+                        border-radius: 6px;
+                        margin-bottom: 0.3rem;
+                        align-items: center;
+                        transition: background 0.2s;
+                    }
+                    .portfolio-table-row:hover {
+                        background: rgba(99, 102, 241, 0.2);
+                    }
+                    .stock-name-link {
+                        color: #60a5fa !important;
+                        cursor: pointer;
+                        text-decoration: underline;
+                        font-weight: 500;
+                    }
+                    .stock-name-link:hover {
+                        color: #3b82f6 !important;
+                    }
+                    .progress-bar-container {
+                        width: 100%;
+                        height: 24px;
+                        background: rgba(55, 65, 81, 0.5);
+                        border-radius: 12px;
+                        overflow: hidden;
+                        position: relative;
+                    }
+                    .progress-bar-fill {
+                        height: 100%;
+                        background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                        border-radius: 12px;
+                        transition: width 0.3s;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #ffffff;
+                        font-weight: 600;
+                        font-size: 0.85rem;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # 테이블 헤더 (클릭 가능한 정렬 버튼)
+                    header_cols = st.columns([0.5, 2, 2, 2, 1])
+                    with header_cols[0]:
+                        st.markdown("<div style='text-align: center; font-weight: 600; color: #ffffff;'>#</div>", unsafe_allow_html=True)
+                    
+                    # 정렬 가능한 헤더 생성
+                    sortable_headers = [
+                        ("종목명", "name", header_cols[1]),
+                        ("현재 매입금액 (% 비중)", "totalInvested", header_cols[2]),
+                        ("매수 진행률", "progress", header_cols[3]),
+                        ("비중", "percentage", header_cols[4])
+                    ]
+                    
+                    for header_text, col_name, col in sortable_headers:
+                        with col:
+                            is_current_sort = st.session_state['portfolio_sort_col'] == col_name
+                            sort_indicator = ""
+                            if is_current_sort:
+                                sort_indicator = " ↑" if st.session_state['portfolio_sort_asc'] else " ↓"
+                            
+                            if st.button(f"{header_text}{sort_indicator}", key=f"sort_{col_name}", use_container_width=True):
+                                if st.session_state['portfolio_sort_col'] == col_name:
+                                    # 같은 컬럼 클릭 시 오름차순/내림차순 토글
+                                    st.session_state['portfolio_sort_asc'] = not st.session_state['portfolio_sort_asc']
+                                else:
+                                    # 다른 컬럼 클릭 시 내림차순으로 설정
+                                    st.session_state['portfolio_sort_col'] = col_name
+                                    st.session_state['portfolio_sort_asc'] = False
+                                st.rerun()
+                            
+                            # 헤더 버튼 스타일
+                            st.markdown(f"""
+                            <style>
+                            button[key="sort_{col_name}"] {{
+                                background: rgba(99, 102, 241, 0.2) !important;
+                                color: #ffffff !important;
+                                font-weight: 600 !important;
+                                border: none !important;
+                                cursor: pointer !important;
+                            }}
+                            button[key="sort_{col_name}"]:hover {{
+                                background: rgba(99, 102, 241, 0.3) !important;
+                            }}
+                            </style>
+                            """, unsafe_allow_html=True)
+                    
+                    # 테이블 행
+                    for row_idx, (_, row) in enumerate(display_df.iterrows()):
+                        name = row['name']
+                        invested = row['totalInvested']
+                        progress = row['progress']
+                        percentage = row['percentage']
+                        stock_id = row.get('id', '')
+                        
+                        # 진행률에 따른 색상
+                        if progress >= 100:
+                            progress_color = "#10b981"
+                        elif progress >= 50:
+                            progress_color = "#3b82f6"
+                        else:
+                            progress_color = "#6366f1"
+                        
+                        # 종목명 클릭 시 해당 종목으로 이동
+                        row_cols = st.columns([0.5, 2, 2, 2, 1])
+                        with row_cols[0]:
+                            st.markdown(f"<div style='text-align: center; color: #9ca3af;'>{row_idx + 1}</div>", unsafe_allow_html=True)
+                        with row_cols[1]:
+                            if st.button(name, key=f"stock_link_{stock_id}_{row_idx}", use_container_width=True):
+                                st.session_state[f"expand_{stock_id}"] = True
+                                st.session_state[f"scroll_to_{stock_id}"] = True
+                                st.rerun()
+                            st.markdown(f"""
+                            <style>
+                            button[key="stock_link_{stock_id}_{row_idx}"] {{
+                                background: transparent !important;
+                                color: #60a5fa !important;
+                                text-decoration: underline !important;
+                                font-weight: 500 !important;
+                                border: none !important;
+                                box-shadow: none !important;
+                            }}
+                            button[key="stock_link_{stock_id}_{row_idx}"]:hover {{
+                                color: #3b82f6 !important;
+                            }}
+                            </style>
+                            """, unsafe_allow_html=True)
+                        with row_cols[2]:
+                            st.markdown(f"<div style='color: #ffffff;'>₩{invested:,.0f} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
+                        with row_cols[3]:
+                            st.markdown(f"""
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill" style="width: {min(100, max(0, progress))}%; background: linear-gradient(90deg, {progress_color}, {progress_color}dd);">
+                                    {progress:.2f}%
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; color: #9ca3af;">{percentage:.1f}%</div>
-                </div>
-                """, unsafe_allow_html=True)
+                            """, unsafe_allow_html=True)
+                        with row_cols[4]:
+                            st.markdown(f"<div style='text-align: center; color: #9ca3af;'>{percentage:.1f}%</div>", unsafe_allow_html=True)
     
     st.divider()
     
@@ -1919,11 +1981,32 @@ with tab2:
             
             # 종목 카드 (뱃지 클릭 시 열리도록)
             expander_key = f"expand_{stock_id}"
+            scroll_key = f"scroll_to_{stock_id}"
             is_expanded = st.session_state.get(expander_key, False)
+            should_scroll = st.session_state.get(scroll_key, False)
+            
+            # Expander에 고유 ID 추가 (스크롤용)
+            st.markdown(f'<div id="stock_detail_{stock_id}"></div>', unsafe_allow_html=True)
+            
             with st.expander(f"📊 {stock_name}", expanded=is_expanded):
                 # expander가 열렸으면 session_state 초기화
                 if is_expanded:
                     st.session_state[expander_key] = False
+                
+                # 스크롤이 필요한 경우 (expander 내부에서 실행)
+                if should_scroll:
+                    st.session_state[scroll_key] = False
+                    # JavaScript로 스크롤 이동
+                    st.markdown(f"""
+                    <script>
+                    setTimeout(function() {{
+                        const element = document.getElementById('stock_detail_{stock_id}');
+                        if (element) {{
+                            element.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                        }}
+                    }}, 300);
+                    </script>
+                    """, unsafe_allow_html=True)
                 # 요약 정보
                 col1, col2, col3, col4, col5 = st.columns(5)
                 col1.metric("최대 매수 가능액", f"{max_investment:,.0f}원")
