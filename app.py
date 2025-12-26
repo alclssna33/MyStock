@@ -332,6 +332,7 @@ def save_stocks(df):
         
         # 캐시 무효화 (다음 로드 시 최신 데이터 가져오기)
         load_stocks.clear()
+        load_split_purchase_data.clear()  # 분할 매수 플래너 캐시도 초기화
         
     except Exception as e:
         st.error(f"❌ 데이터 저장 실패: {str(e)}")
@@ -1264,12 +1265,20 @@ with tab2:
     
     # Installments가 있는 종목만 필터링 (분할 매수 플래너용)
     if not df_split.empty:
-        # Installments가 비어있지 않은 종목만
-        df_split = df_split[
-            df_split['Installments'].notna() & 
-            (df_split['Installments'] != '') & 
-            (df_split['Installments'] != 0)
-        ].copy()
+        # Installments가 비어있지 않은 종목만 (숫자 또는 문자열 모두 처리)
+        def has_installments(val):
+            if pd.isna(val):
+                return False
+            if val == '' or val == 0:
+                return False
+            try:
+                # 숫자로 변환 가능한지 확인
+                float_val = float(val)
+                return float_val > 0
+            except (ValueError, TypeError):
+                return False
+        
+        df_split = df_split[df_split['Installments'].apply(has_installments)].copy()
         
         # JSON 파싱 (필터링 후)
         if 'BuyTransactions' in df_split.columns:
