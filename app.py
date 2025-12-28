@@ -1778,26 +1778,90 @@ with tab2:
         max_investment = market_cap_value / 10000
         amount_per_installment = max_investment / installments if installments > 0 else 0
         
-        # 투자 현황 계산
-        total_buy_cost = 0
-        total_buy_qty = 0
-        for tx in buy_txs:
-            if isinstance(tx, dict):
-                total_buy_cost += tx.get('price', 0) * tx.get('quantity', 0)
-                total_buy_qty += tx.get('quantity', 0)
+        # === 이동평균법(Moving Average Cost) 계산 로직 ===
+        # 1. 데이터 통합 및 정렬
+        all_transactions = []
         
-        total_sell_qty = sum(tx.get('quantity', 0) for tx in sell_txs if isinstance(tx, dict))
-        avg_price = total_buy_cost / total_buy_qty if total_buy_qty > 0 else 0
-        current_qty = total_buy_qty - total_sell_qty
+        # 매수 거래 추가
+        for tx in buy_txs:
+            if isinstance(tx, dict) and tx.get('date') and tx.get('price') and tx.get('quantity'):
+                try:
+                    tx_date = pd.to_datetime(tx.get('date')).date()
+                    all_transactions.append({
+                        'type': 'buy',
+                        'date': tx_date,
+                        'price': float(tx.get('price', 0)),
+                        'quantity': int(tx.get('quantity', 0)),
+                        'original_tx': tx
+                    })
+                except:
+                    pass
+        
+        # 매도 거래 추가
+        for tx in sell_txs:
+            if isinstance(tx, dict) and tx.get('date') and tx.get('price') and tx.get('quantity'):
+                try:
+                    tx_date = pd.to_datetime(tx.get('date')).date()
+                    all_transactions.append({
+                        'type': 'sell',
+                        'date': tx_date,
+                        'price': float(tx.get('price', 0)),
+                        'quantity': int(tx.get('quantity', 0)),
+                        'original_tx': tx
+                    })
+                except:
+                    pass
+        
+        # 날짜 순으로 정렬 (날짜가 같으면 매수가 먼저)
+        all_transactions.sort(key=lambda x: (x['date'], 0 if x['type'] == 'buy' else 1))
+        
+        # 2. 순차적 계산 루프
+        current_qty = 0
+        current_avg_price = 0.0
+        total_realized_profit = 0.0
+        
+        for tx in all_transactions:
+            if tx['type'] == 'buy':
+                # 매수 발생 시: 평단가 갱신
+                buy_price = tx['price']
+                buy_qty = tx['quantity']
+                
+                if current_qty == 0:
+                    # 첫 매수
+                    current_avg_price = buy_price
+                    current_qty = buy_qty
+                else:
+                    # 추가 매수: 이동평균 계산
+                    total_cost_before = current_qty * current_avg_price
+                    total_cost_new = buy_qty * buy_price
+                    current_qty += buy_qty
+                    current_avg_price = (total_cost_before + total_cost_new) / current_qty
+                    
+            elif tx['type'] == 'sell':
+                # 매도 발생 시: 실현손익 계산 (현재 시점의 평단가 기준)
+                sell_price = tx['price']
+                sell_qty = tx['quantity']
+                
+                if current_avg_price > 0:
+                    # 실현손익 계산
+                    realized_profit = (sell_price - current_avg_price) * sell_qty
+                    yield_pct = ((sell_price - current_avg_price) / current_avg_price * 100) if current_avg_price > 0 else 0
+                    
+                    # 매도 거래 객체에 계산된 값 저장
+                    tx['original_tx']['realized_profit'] = realized_profit
+                    tx['original_tx']['yield_pct'] = yield_pct
+                    
+                    total_realized_profit += realized_profit
+                
+                # 수량 감소 (평단가는 변하지 않음)
+                current_qty -= sell_qty
+                if current_qty < 0:
+                    current_qty = 0
+        
+        # 3. 결과 적용
+        avg_price = current_avg_price  # 현재 보유 물량에 대한 평단가
         current_invested = current_qty * avg_price
         progress = (current_invested / max_investment * 100) if max_investment > 0 else 0
-        
-        # 실현 손익 계산
-        total_realized_profit = 0
-        for tx in sell_txs:
-            if isinstance(tx, dict) and avg_price > 0:
-                profit = (tx.get('price', 0) - avg_price) * tx.get('quantity', 0)
-                total_realized_profit += profit
         
         # 종목명 표시
         st.subheader(f"{stock_name}")
@@ -2028,8 +2092,9 @@ with tab2:
                 # 각 매도 기록을 카드 형태로 표시
                 for i, tx in enumerate(sell_txs):
                     if isinstance(tx, dict):
-                        profit = (tx.get('price', 0) - avg_price) * tx.get('quantity', 0) if avg_price > 0 else 0
-                        yield_pct = ((tx.get('price', 0) - avg_price) / avg_price * 100) if avg_price > 0 else 0
+                        # 이동평균법으로 계산된 값 사용 (없으면 0)
+                        profit = tx.get('realized_profit', 0)
+                        yield_pct = tx.get('yield_pct', 0)
                         
                         # 날짜 파싱
                         tx_date = None
