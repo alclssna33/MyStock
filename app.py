@@ -78,7 +78,7 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* === 5. 버튼 스타일 (수정됨: 단순화 및 우선순위 조정) === */
+    /* === 5. 버튼 스타일 (수정됨: 실제 DOM 구조에 맞춤) === */
     
     /* [1. 공통 베이스] 모든 버튼 텍스트 색상 강제 */
     button,
@@ -114,65 +114,77 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
     }
     
-    /* [3. Secondary 버튼] 파란색 - 수정/취소 (기본 스타일 덮어쓰기) */
-    .stButton > button[data-testid="baseButton-secondary"],
-    button[data-testid="baseButton-secondary"],
-    div[data-testid="stDialog"] button[data-testid="baseButton-secondary"],
-    div[data-testid="stForm"] button[data-testid="baseButton-secondary"],
-    div[role="dialog"] button[data-testid="baseButton-secondary"],
-    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-secondary"],
-    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-secondary"],
-    div[role="dialog"] form button[type="submit"][data-testid="baseButton-secondary"] {
+    /* [3. Secondary 버튼] 파란색 - 수정/취소 (실제 DOM 속성 사용) */
+    button[data-testid="stBaseButton-secondaryFormSubmit"],
+    button[kind="secondaryFormSubmit"],
+    .stButton > button[data-testid="stBaseButton-secondaryFormSubmit"],
+    .stButton > button[kind="secondaryFormSubmit"],
+    div[data-testid="stDialog"] button[data-testid="stBaseButton-secondaryFormSubmit"],
+    div[data-testid="stDialog"] button[kind="secondaryFormSubmit"],
+    div[data-testid="stForm"] button[data-testid="stBaseButton-secondaryFormSubmit"],
+    div[data-testid="stForm"] button[kind="secondaryFormSubmit"],
+    div[role="dialog"] button[data-testid="stBaseButton-secondaryFormSubmit"],
+    div[role="dialog"] button[kind="secondaryFormSubmit"] {
         background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
         box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3) !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #FFFFFF !important;
     }
-    .stButton > button[data-testid="baseButton-secondary"]:hover,
-    button[data-testid="baseButton-secondary"]:hover,
-    div[data-testid="stDialog"] button[data-testid="baseButton-secondary"]:hover,
-    div[data-testid="stForm"] button[data-testid="baseButton-secondary"]:hover,
-    div[role="dialog"] button[data-testid="baseButton-secondary"]:hover,
-    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-secondary"]:hover,
-    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-secondary"]:hover,
-    div[role="dialog"] form button[type="submit"][data-testid="baseButton-secondary"]:hover {
+    button[data-testid="stBaseButton-secondaryFormSubmit"]:hover,
+    button[kind="secondaryFormSubmit"]:hover,
+    .stButton > button[data-testid="stBaseButton-secondaryFormSubmit"]:hover,
+    .stButton > button[kind="secondaryFormSubmit"]:hover,
+    div[data-testid="stDialog"] button[data-testid="stBaseButton-secondaryFormSubmit"]:hover,
+    div[data-testid="stDialog"] button[kind="secondaryFormSubmit"]:hover,
+    div[data-testid="stForm"] button[data-testid="stBaseButton-secondaryFormSubmit"]:hover,
+    div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover,
+    div[role="dialog"] button[data-testid="stBaseButton-secondaryFormSubmit"]:hover,
+    div[role="dialog"] button[kind="secondaryFormSubmit"]:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4) !important;
         background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
     }
-    button[data-testid="baseButton-secondary"] p,
-    div[data-testid="stDialog"] button[data-testid="baseButton-secondary"] p,
-    div[data-testid="stForm"] button[data-testid="baseButton-secondary"] p {
+    button[data-testid="stBaseButton-secondaryFormSubmit"] p,
+    button[kind="secondaryFormSubmit"] p,
+    div[data-testid="stDialog"] button[data-testid="stBaseButton-secondaryFormSubmit"] p,
+    div[data-testid="stDialog"] button[kind="secondaryFormSubmit"] p {
         color: #FFFFFF !important;
     }
     
-    /* [4. Primary 버튼] 빨간색 - 기록/삭제/추가 (가장 높은 우선순위) */
-    .stButton > button[data-testid="baseButton-primary"],
-    button[data-testid="baseButton-primary"],
-    div[data-testid="stDialog"] button[data-testid="baseButton-primary"],
-    div[data-testid="stForm"] button[data-testid="baseButton-primary"],
-    div[role="dialog"] button[data-testid="baseButton-primary"],
-    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-primary"],
-    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-primary"],
-    div[role="dialog"] form button[type="submit"][data-testid="baseButton-primary"] {
+    /* [4. Primary 버튼] 빨간색 - 기록/삭제/추가 (실제 DOM 속성 사용) */
+    button[data-testid="stBaseButton-primaryFormSubmit"],
+    button[kind="primaryFormSubmit"],
+    .stButton > button[data-testid="stBaseButton-primaryFormSubmit"],
+    .stButton > button[kind="primaryFormSubmit"],
+    div[data-testid="stDialog"] button[data-testid="stBaseButton-primaryFormSubmit"],
+    div[data-testid="stDialog"] button[kind="primaryFormSubmit"],
+    div[data-testid="stForm"] button[data-testid="stBaseButton-primaryFormSubmit"],
+    div[data-testid="stForm"] button[kind="primaryFormSubmit"],
+    div[role="dialog"] button[data-testid="stBaseButton-primaryFormSubmit"],
+    div[role="dialog"] button[kind="primaryFormSubmit"] {
         background: linear-gradient(135deg, #ef4444 0%, #f87171 100%) !important;
         box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3) !important;
         border: none !important;
+        color: #FFFFFF !important;
     }
-    .stButton > button[data-testid="baseButton-primary"]:hover,
-    button[data-testid="baseButton-primary"]:hover,
-    div[data-testid="stDialog"] button[data-testid="baseButton-primary"]:hover,
-    div[data-testid="stForm"] button[data-testid="baseButton-primary"]:hover,
-    div[role="dialog"] button[data-testid="baseButton-primary"]:hover,
-    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-primary"]:hover,
-    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-primary"]:hover,
-    div[role="dialog"] form button[type="submit"][data-testid="baseButton-primary"]:hover {
+    button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+    button[kind="primaryFormSubmit"]:hover,
+    .stButton > button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+    .stButton > button[kind="primaryFormSubmit"]:hover,
+    div[data-testid="stDialog"] button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+    div[data-testid="stDialog"] button[kind="primaryFormSubmit"]:hover,
+    div[data-testid="stForm"] button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+    div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover,
+    div[role="dialog"] button[data-testid="stBaseButton-primaryFormSubmit"]:hover,
+    div[role="dialog"] button[kind="primaryFormSubmit"]:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 12px rgba(239, 68, 68, 0.4) !important;
         background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
     }
-    button[data-testid="baseButton-primary"] p,
-    div[data-testid="stDialog"] button[data-testid="baseButton-primary"] p,
-    div[data-testid="stForm"] button[data-testid="baseButton-primary"] p {
+    button[data-testid="stBaseButton-primaryFormSubmit"] p,
+    button[kind="primaryFormSubmit"] p,
+    div[data-testid="stDialog"] button[data-testid="stBaseButton-primaryFormSubmit"] p,
+    div[data-testid="stDialog"] button[kind="primaryFormSubmit"] p {
         color: #FFFFFF !important;
     }
 
