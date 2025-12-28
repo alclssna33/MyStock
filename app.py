@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-import FinanceDataReader as fdr
 import plotly.graph_objects as go
 import plotly.express as px
 import os
@@ -10,6 +9,14 @@ import json
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+
+# FinanceDataReader 선택적 임포트 (없어도 앱 실행 가능)
+try:
+    import FinanceDataReader as fdr
+    FDR_AVAILABLE = True
+except ImportError:
+    FDR_AVAILABLE = False
+    fdr = None
 
 # 페이지 설정
 st.set_page_config(
@@ -783,7 +790,7 @@ def get_stock_data(symbol):
             df = None
             
             # 2. FinanceDataReader 사용 (한국 종목)
-            if is_korean:
+            if is_korean and FDR_AVAILABLE:
                 try:
                     df = fdr.DataReader(clean_symbol)
                     # FinanceDataReader는 인덱스가 Date가 아닐 수 있으므로 확인
