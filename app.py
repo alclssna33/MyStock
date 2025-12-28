@@ -2505,6 +2505,25 @@ with tab2:
             chart_df = chart_df[chart_df['totalInvested'] > 0].sort_values('totalInvested', ascending=False)
             
             if not chart_df.empty:
+                # 종목 수에 따라 차트 높이 동적 조정
+                num_stocks = len(chart_df)
+                # 기본 500, 종목이 많을수록 높이 증가 (최대 800)
+                chart_height = min(500 + (num_stocks - 5) * 20, 800) if num_stocks > 5 else 500
+                
+                # 작은 비중 종목들을 "기타"로 묶기 (1% 미만)
+                threshold = total_invested * 0.01  # 1% 기준
+                main_stocks = chart_df[chart_df['totalInvested'] >= threshold]
+                other_stocks = chart_df[chart_df['totalInvested'] < threshold]
+                
+                if len(other_stocks) > 0 and len(main_stocks) > 0:
+                    # "기타" 항목 생성
+                    other_total = other_stocks['totalInvested'].sum()
+                    other_row = pd.DataFrame([{
+                        'name': f'기타 ({len(other_stocks)}개)',
+                        'totalInvested': other_total
+                    }])
+                    chart_df = pd.concat([main_stocks, other_row], ignore_index=True)
+                
                 fig_donut = px.pie(
                     chart_df,
                     values='totalInvested',
@@ -2512,12 +2531,22 @@ with tab2:
                     hole=0.6,
                     color_discrete_sequence=colors
                 )
+                
+                # 텍스트 표시 방식 조정: 일정 비율 이상만 표시
+                # 종목 수가 많으면 label만 표시, 적으면 label+percent
+                if num_stocks > 15:
+                    textinfo = 'label'  # 종목이 많으면 라벨만
+                else:
+                    textinfo = 'label+percent'  # 종목이 적으면 라벨+퍼센트
+                
                 # 중앙에 총 매입금액 표시
                 fig_donut.update_traces(
                     textposition='outside',
-                    textinfo='label+percent',
-                    hovertemplate='<b>%{label}</b><br>매입금액: ₩%{value:,.0f}<br>비중: %{percent}<extra></extra>'
+                    textinfo=textinfo,
+                    hovertemplate='<b>%{label}</b><br>매입금액: ₩%{value:,.0f}<br>비중: %{percent}<extra></extra>',
+                    textfont=dict(size=10 if num_stocks > 15 else 12)  # 종목이 많으면 폰트 크기 줄임
                 )
+                
                 fig_donut.update_layout(
                     title=dict(
                         text="포트폴리오 요약",
@@ -2543,12 +2572,12 @@ with tab2:
                         y=0.5,
                         xanchor="left",
                         x=1.05,
-                        font=dict(color='#ffffff', size=12, family='Pretendard')
+                        font=dict(color='#ffffff', size=10 if num_stocks > 20 else 12, family='Pretendard')  # 범례 폰트도 조정
                     ),
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
                     font=dict(color='#ffffff', family='Pretendard'),
-                    height=500,
+                    height=chart_height,  # 동적 높이 사용
                     margin=dict(l=0, r=150, t=80, b=0)
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
