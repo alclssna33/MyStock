@@ -2143,7 +2143,15 @@ with tab2:
             # 투자전략 필터링 적용
             if strategy_filter != "전체":
                 df_split = df_split[df_split['Category'].astype(str).str.strip() == strategy_filter].copy()
-    with col_header2:
+            
+            # 총 예산 표시를 위한 placeholder (나중에 업데이트)
+            st.session_state['budget_placeholder'] = st.empty()
+        else:
+            st.session_state['budget_placeholder'] = st.empty()
+    
+    with col_header3:
+        # 진행률 표시를 위한 placeholder (나중에 업데이트)
+        st.session_state['progress_placeholder'] = st.empty()
         # 우측 상단 버튼 영역
         st.markdown("<br>", unsafe_allow_html=True)  # 여백
         with st.expander("➕ 새 종목 추가", expanded=False):
@@ -2301,30 +2309,34 @@ with tab2:
         
         overall_progress = (total_invested / total_budget * 100) if total_budget > 0 else 0
         
-        # 요약 메트릭 (하단에 표시)
-        col_summary1, col_summary2 = st.columns(2)
-        with col_summary1:
-            st.markdown(f"""
+        # 총 예산과 진행률을 상단 우측 빨간박스에 표시
+        # 총 예산 (위쪽 빨간박스 - col_header2)
+        if 'budget_placeholder' in st.session_state:
+            st.session_state['budget_placeholder'].markdown(f"""
             <div style="
-                background: rgba(99, 102, 241, 0.1);
+                background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
                 border-radius: 10px;
-                padding: 1.5rem;
-                margin-bottom: 1rem;
+                padding: 1rem;
+                margin-bottom: 0.5rem;
+                box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
             ">
-                <div style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 0.5rem;">총 예산</div>
-                <div style="color: #ffffff; font-size: 1.8rem; font-weight: 700;">₩{total_budget:,.0f}</div>
+                <div style="color: rgba(255, 255, 255, 0.9); font-size: 0.85rem; margin-bottom: 0.3rem;">총 예산</div>
+                <div style="color: #ffffff; font-size: 1.5rem; font-weight: 700;">₩{total_budget:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
-        with col_summary2:
-            st.markdown(f"""
+        
+        # 진행률 (아랫쪽 빨간박스 - col_header3)
+        if 'progress_placeholder' in st.session_state:
+            st.session_state['progress_placeholder'].markdown(f"""
             <div style="
-                background: rgba(99, 102, 241, 0.1);
+                background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
                 border-radius: 10px;
-                padding: 1.5rem;
-                margin-bottom: 1rem;
+                padding: 1rem;
+                margin-bottom: 0.5rem;
+                box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
             ">
-                <div style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 0.5rem;">진행률</div>
-                <div style="color: #60a5fa; font-size: 1.8rem; font-weight: 700;">{overall_progress:.2f}%</div>
+                <div style="color: rgba(255, 255, 255, 0.9); font-size: 0.85rem; margin-bottom: 0.3rem;">진행률</div>
+                <div style="color: #ffffff; font-size: 1.5rem; font-weight: 700;">{overall_progress:.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
         
