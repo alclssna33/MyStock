@@ -2345,7 +2345,7 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성 (stElementContainer 형제 선택자)"""
+                """CSS 오버레이 기법으로 뱃지 생성 (구조 기반 선택자)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
@@ -2379,39 +2379,40 @@ with tab2:
                     pointer-events: none;
                 ">{name}</div>
                 <style>
-                    /* 1. 뱃지가 들어있는 ElementContainer의 '바로 다음' 형제 ElementContainer 찾기 */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button {{
-                        /* 버튼 위치를 강제로 뱃지 위로 끌어올림 */
-                        margin-top: -53px !important; /* 뱃지 높이 + 여백 고려 */
+                    /* [핵심 수정] 
+                       1. div:has(#{unique_id}) -> 뱃지 ID를 포함하고 있는 모든 상위 div를 찾습니다.
+                       2. + div -> 그 div 바로 다음에 오는 형제 div(버튼 컨테이너)를 찾습니다.
+                       3. button -> 그 안에 있는 버튼을 타겟팅합니다.
+                    */
+                    div:has(#{unique_id}) + div button {{
+                        /* 버튼을 강제로 위로 끌어올려 뱃지와 겹치게 함 */
+                        margin-top: -53px !important; 
                         height: 53px !important;
                         
-                        /* 투명화 및 클릭 영역 확보 */
+                        /* 투명화 처리 */
                         opacity: 0 !important;
                         background: transparent !important;
                         border: none !important;
                         color: transparent !important;
+                        
+                        /* 클릭 기능 활성화 */
                         z-index: 10 !important;
                         width: 100% !important;
                         cursor: pointer !important;
                         position: relative !important;
-                        padding: 0 !important;
-                        margin-left: 0 !important;
-                        margin-right: 0 !important;
                         pointer-events: auto !important;
                     }}
                     
                     /* 호버 시에도 투명 유지 */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button:hover {{
+                    div:has(#{unique_id}) + div button:hover {{
                         background: transparent !important;
                         border: none !important;
                         opacity: 0 !important;
                     }}
                     
-                    /* 버튼 컨테이너도 조정 (공간 차지 방지) */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] {{
-                        margin-top: -53px !important;
-                        position: relative !important;
-                        z-index: 10 !important;
+                    /* 버튼 클릭 시 텍스트(종목명)가 보라색으로 깜빡이는 현상 방지 */
+                    div:has(#{unique_id}) + div button:active {{
+                        color: transparent !important;
                     }}
                 </style>
                 """, unsafe_allow_html=True)
