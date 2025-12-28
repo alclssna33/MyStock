@@ -765,11 +765,26 @@ def save_stocks(df):
 # 주가 데이터 가져오기 (하이브리드 방식: FinanceDataReader + yfinance)
 @st.cache_data(ttl=7200)  # 2시간 캐싱 (rate limiting 방지)
 def get_stock_data(symbol):
+    # symbol 유효성 검사
+    if symbol is None:
+        st.error("❌ 종목 코드가 제공되지 않았습니다.")
+        return None
+    
+    # symbol을 문자열로 변환
+    try:
+        symbol = str(symbol).strip()
+        if not symbol:
+            st.error("❌ 종목 코드가 비어있습니다.")
+            return None
+    except Exception:
+        st.error("❌ 종목 코드 형식이 올바르지 않습니다.")
+        return None
+    
     max_retries = 3
     retry_delay = 2  # 초기 지연 시간 (초)
     
     # 1. 한국 종목 코드 정제 (숫자 6자리 추출)
-    clean_symbol = symbol.strip().upper()
+    clean_symbol = symbol.upper()
     is_korean = False
     
     # .KS, .KQ 제거 후 순수 숫자인지 확인
