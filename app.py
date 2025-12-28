@@ -187,6 +187,43 @@ st.markdown("""
     div[data-testid="stDialog"] button[kind="primaryFormSubmit"] p {
         color: #FFFFFF !important;
     }
+    
+    /* === 뱃지 오버레이 버튼 숨기기 (종목별 현황) === */
+    /* 뱃지가 있는 컨테이너 다음에 오는 버튼 컨테이너 타겟팅 */
+    div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) + div[data-testid="stButton"],
+    div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) ~ div[data-testid="stButton"],
+    div:has(.badge-overlay-visual) + div[data-testid="stButton"],
+    div:has(.badge-overlay-visual) ~ div[data-testid="stButton"] {
+        margin-top: -48px !important;
+        position: relative !important;
+        z-index: 10 !important;
+        pointer-events: auto !important;
+    }
+    
+    /* 뱃지 오버레이 버튼 완전히 투명하게 */
+    div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) + div[data-testid="stButton"] button,
+    div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) ~ div[data-testid="stButton"] button,
+    div:has(.badge-overlay-visual) + div[data-testid="stButton"] button,
+    div:has(.badge-overlay-visual) ~ div[data-testid="stButton"] button {
+        opacity: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        color: transparent !important;
+        width: 100% !important;
+        min-height: 48px !important;
+        height: 48px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        cursor: pointer !important;
+        position: relative !important;
+        z-index: 10 !important;
+        pointer-events: auto !important;
+    }
+    
+    /* 뱃지 시각적 요소는 클릭 불가 (버튼이 클릭 처리) */
+    .badge-overlay-visual {
+        pointer-events: none !important;
+    }
 
     /* === 6. 사이드바 스타일 === */
     section[data-testid="stSidebar"] {
@@ -2308,42 +2345,14 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성 (렌더링 통합 + 강력한 선택자)"""
+                """CSS 오버레이 기법으로 뱃지 생성 (전역 CSS 사용)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
                 gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
                 
-                # HTML과 CSS를 하나의 st.markdown으로 통합 렌더링
+                # HTML div로 시각적 뱃지 생성 (전역 CSS가 오버레이 처리)
                 st.markdown(f"""
-                <style>
-                /* 강력한 선택자: 뱃지가 들어있는 div의 바로 다음 형제 div 안의 버튼 타겟팅 */
-                div:has(> .badge-overlay-visual) + div button,
-                div:has(.badge-overlay-visual) + div[data-testid="stButton"] button,
-                div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) + div[data-testid="stButton"] button,
-                div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) ~ div[data-testid="stButton"] button {{
-                    opacity: 0 !important;
-                    background: transparent !important;
-                    border: none !important;
-                    color: transparent !important;
-                    width: 100% !important;
-                    min-height: 48px !important;
-                    height: 48px !important;
-                    padding: 0 !important;
-                    margin: 0 !important;
-                    cursor: pointer !important;
-                    position: relative !important;
-                    z-index: 10 !important;
-                }}
-                /* 버튼 컨테이너 위치 조정 */
-                div:has(> .badge-overlay-visual) + div[data-testid="stButton"],
-                div:has(.badge-overlay-visual) + div[data-testid="stButton"],
-                div[data-testid="stMarkdownContainer"]:has(.badge-overlay-visual) + div[data-testid="stButton"] {{
-                    margin-top: -48px !important;
-                    position: relative !important;
-                    z-index: 10 !important;
-                }}
-                </style>
                 <div class="badge-overlay-visual" style="
                     background: {gradient};
                     border: 2px solid {dark_green};
@@ -2364,10 +2373,11 @@ with tab2:
                     position: relative;
                     z-index: 1;
                     user-select: none;
+                    pointer-events: none;
                 ">{name}</div>
                 """, unsafe_allow_html=True)
                 
-                # 투명 버튼 생성
+                # 투명 버튼 생성 (전역 CSS가 투명하게 처리)
                 if st.button(name, key=key, use_container_width=True):
                     return True
                 return False
