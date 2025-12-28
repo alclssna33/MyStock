@@ -2345,16 +2345,18 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성 (stElementContainer 형제 선택자)"""
+                """CSS 오버레이 기법으로 뱃지 생성 (JavaScript 동적 처리)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
                 gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
                 
-                # 고유 ID 생성 (스타일 충돌 방지)
+                # 고유 ID 생성
                 unique_id = f"badge-{key.replace('_', '-')}"
+                # JavaScript에서 사용할 텍스트 (특수문자 이스케이프)
+                badge_text_escaped = name.replace("'", "\\'").replace('"', '\\"')
                 
-                # HTML과 CSS를 하나의 st.markdown으로 통합 렌더링
+                # HTML과 CSS + JavaScript 통합 렌더링
                 st.markdown(f"""
                 <div id="{unique_id}" class="badge-overlay-visual" style="
                     background: {gradient};
@@ -2378,51 +2380,90 @@ with tab2:
                     user-select: none;
                     pointer-events: none;
                 ">{name}</div>
-                <style>
-                    /* [핵심 수정] 
-                       1. data-testid="stElementContainer"를 가진 div 중, 뱃지 ID를 포함한 것을 찾음 (포장지 1)
-                       2. 그 바로 뒤에 오는 data-testid="stElementContainer"를 찾음 (포장지 2)
-                       3. 그 안의 button을 타겟팅
-                    */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button {{
-                        /* 위치를 강제로 위로 끌어올림 (뱃지 높이 + 여백) */
-                        margin-top: -53px !important; 
-                        height: 53px !important;
+                <script>
+                    (function() {{
+                        const badgeId = '{unique_id}';
+                        const badgeText = '{badge_text_escaped}';
                         
-                        /* 완전 투명화 */
-                        opacity: 0 !important;
-                        background-color: transparent !important;
-                        border: none !important;
-                        color: transparent !important;
+                        function hideButton() {{
+                            // 뱃지 요소 찾기
+                            const badge = document.getElementById(badgeId);
+                            if (!badge) return;
+                            
+                            // 뱃지의 부모 컨테이너 찾기
+                            let container = badge.closest('[data-testid="stElementContainer"]') || 
+                                           badge.closest('[data-testid="stVerticalBlock"]') ||
+                                           badge.closest('[data-testid="column"]');
+                            
+                            if (!container) return;
+                            
+                            // 컨테이너 다음에 오는 모든 형제 요소 탐색
+                            let sibling = container.nextElementSibling;
+                            let found = false;
+                            
+                            // 최대 5개 형제까지 탐색 (안전장치)
+                            for (let i = 0; i < 5 && sibling; i++) {{
+                                // stButton 컨테이너 찾기
+                                const buttonContainer = sibling.querySelector('[data-testid="stButton"]');
+                                if (buttonContainer) {{
+                                    const button = buttonContainer.querySelector('button');
+                                    if (button) {{
+                                        // 버튼 텍스트 확인 (정확한 매칭)
+                                        const buttonText = button.textContent.trim() || 
+                                                         button.querySelector('p')?.textContent.trim() || 
+                                                         button.querySelector('span')?.textContent.trim() || '';
+                                        
+                                        if (buttonText === badgeText || buttonText.includes(badgeText) || badgeText.includes(buttonText)) {{
+                                            // 버튼 스타일 적용
+                                            button.style.cssText = 'opacity: 0 !important; background: transparent !important; border: none !important; color: transparent !important; width: 100% !important; height: 53px !important; min-height: 53px !important; padding: 0 !important; margin: 0 !important; margin-top: -53px !important; cursor: pointer !important; position: relative !important; z-index: 99 !important; pointer-events: auto !important;';
+                                            
+                                            // 버튼 컨테이너도 조정
+                                            buttonContainer.style.cssText = 'margin-top: -53px !important; position: relative !important; z-index: 99 !important;';
+                                            
+                                            // 호버/포커스/액티브 상태도 처리
+                                            button.addEventListener('mouseenter', function(e) {{
+                                                e.target.style.background = 'transparent';
+                                                e.target.style.border = 'none';
+                                            }});
+                                            button.addEventListener('focus', function(e) {{
+                                                e.target.style.background = 'transparent';
+                                                e.target.style.border = 'none';
+                                                e.target.style.color = 'transparent';
+                                            }});
+                                            button.addEventListener('mousedown', function(e) {{
+                                                e.target.style.background = 'transparent';
+                                                e.target.style.border = 'none';
+                                                e.target.style.color = 'transparent';
+                                            }});
+                                            
+                                            found = true;
+                                            break;
+                                        }}
+                                    }}
+                                }}
+                                sibling = sibling.nextElementSibling;
+                            }}
+                        }}
                         
-                        /* 최상단 레이어로 올려서 클릭 받기 */
-                        z-index: 99 !important;
-                        width: 100% !important;
-                        cursor: pointer !important;
-                        position: relative !important;
-                        pointer-events: auto !important;
-                    }}
-                    
-                    /* 호버 상태 제거 */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button:hover {{
-                        background: transparent !important;
-                        border: none !important;
-                    }}
-                    
-                    /* 포커스 상태 제거 */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button:focus {{
-                        background: transparent !important;
-                        border: none !important;
-                        color: transparent !important;
-                    }}
-                    
-                    /* 버튼 활성화(클릭) 시 스타일 제거 */
-                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button:active {{
-                        background: transparent !important;
-                        border: none !important;
-                        color: transparent !important;
-                    }}
-                </style>
+                        // DOM 로드 후 실행
+                        if (document.readyState === 'loading') {{
+                            document.addEventListener('DOMContentLoaded', hideButton);
+                        }} else {{
+                            hideButton();
+                        }}
+                        
+                        // MutationObserver로 동적 추가 감지
+                        const observer = new MutationObserver(hideButton);
+                        observer.observe(document.body, {{
+                            childList: true,
+                            subtree: true
+                        }});
+                        
+                        // 짧은 지연 후 재시도 (Streamlit 렌더링 대기)
+                        setTimeout(hideButton, 100);
+                        setTimeout(hideButton, 500);
+                    }})();
+                </script>
                 """, unsafe_allow_html=True)
                 
                 # 투명 버튼 생성
