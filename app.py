@@ -2556,7 +2556,7 @@ with tab2:
                     }
                     .portfolio-table-header {
                         display: grid;
-                        grid-template-columns: 0.5fr 2fr 2fr 2fr 1fr;
+                        grid-template-columns: 0.5fr 1.2fr 2fr 2fr 1fr;
                         gap: 1rem;
                         padding: 1rem;
                         background: rgba(99, 102, 241, 0.2);
@@ -2577,7 +2577,7 @@ with tab2:
                     }
                     .portfolio-table-row {
                         display: grid;
-                        grid-template-columns: 0.5fr 1.33fr 2fr 2fr 1fr;
+                        grid-template-columns: 0.5fr 1fr 2fr 2fr 1fr;
                         gap: 1rem;
                         padding: 0.8rem 1rem;
                         background: rgba(59, 130, 246, 0.15);
@@ -2622,8 +2622,8 @@ with tab2:
                     """, unsafe_allow_html=True)
                     
                     # 테이블 헤더 (클릭 가능한 정렬 버튼)
-                    # 종목명 가로 길이를 2/3로 줄임: 2 * 2/3 = 1.33
-                    header_cols = st.columns([0.5, 1.33, 2, 2, 1])
+                    # 종목명 가로 길이를 더 줄임 (이수스페셜티케미칼이 한 줄로 표시되도록)
+                    header_cols = st.columns([0.5, 1.2, 2, 2, 1])
                     with header_cols[0]:
                         st.markdown("<div style='text-align: center; font-weight: 600; color: #ffffff;'>#</div>", unsafe_allow_html=True)
                     
@@ -2685,8 +2685,8 @@ with tab2:
                             progress_color = "#6366f1"
                         
                         # 종목명 클릭 시 해당 종목으로 이동
-                        # 종목명 가로 길이를 2/3로 줄임: 2 * 2/3 = 1.33
-                        row_cols = st.columns([0.5, 1.33, 2, 2, 1])
+                        # 종목명 가로 길이를 더 줄임 (이수스페셜티케미칼이 한 줄로 표시되도록)
+                        row_cols = st.columns([0.5, 1, 2, 2, 1])
                         with row_cols[0]:
                             st.markdown(f"<div style='text-align: center; color: #9ca3af;'>{row_idx + 1}</div>", unsafe_allow_html=True)
                         with row_cols[1]:
@@ -2696,15 +2696,23 @@ with tab2:
                             st.markdown(f"""
                             <style>
                             button[key="stock_link_{stock_id}_{row_idx}"] {{
-                                background: transparent !important;
-                                color: #60a5fa !important;
-                                text-decoration: underline !important;
+                                background: rgba(16, 185, 129, 0.2) !important;
+                                color: #10b981 !important;
+                                text-decoration: none !important;
                                 font-weight: 500 !important;
-                                border: none !important;
-                                box-shadow: none !important;
+                                border: 1px solid rgba(16, 185, 129, 0.3) !important;
+                                box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1) !important;
+                                border-radius: 6px !important;
+                                padding: 0.4rem 0.6rem !important;
+                                white-space: nowrap !important;
+                                overflow: hidden !important;
+                                text-overflow: ellipsis !important;
                             }}
                             button[key="stock_link_{stock_id}_{row_idx}"]:hover {{
-                                color: #3b82f6 !important;
+                                background: rgba(16, 185, 129, 0.3) !important;
+                                color: #059669 !important;
+                                border-color: rgba(16, 185, 129, 0.5) !important;
+                                box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2) !important;
                             }}
                             </style>
                             """, unsafe_allow_html=True)
