@@ -78,80 +78,55 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* === 5. 버튼 스타일 (리팩토링: data-testid 기반, 모듈화) === */
+    /* === 5. 버튼 스타일 (수정됨: 단순화 및 우선순위 조정) === */
     
-    /* [1. 공통 베이스] 모든 버튼 텍스트 색상 강제 (전역 설정보다 우선) */
+    /* [1. 공통 베이스] 모든 버튼 텍스트 색상 강제 */
     button,
     button p,
-    button span,
-    .stButton > button,
-    .stButton > button p,
-    .stButton > button span {
+    button span {
         color: #FFFFFF !important;
     }
     
-    /* [2. Primary 버튼] 기록/추가/삭제 등 주요 액션 - 빨간색 그라데이션 */
-    .stButton > button[data-testid="baseButton-primary"],
-    button[data-testid="baseButton-primary"],
-    div[data-testid="stDialog"] button[data-testid="baseButton-primary"],
-    div[data-testid="stForm"] button[data-testid="baseButton-primary"],
-    div[role="dialog"] button[data-testid="baseButton-primary"],
-    /* form submit button도 포함 */
-    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-primary"],
-    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-primary"],
-    div[role="dialog"] form button[type="submit"][data-testid="baseButton-primary"] {
-        background: linear-gradient(135deg, #ef4444 0%, #f87171 100%) !important; /* Red Gradient */
+    /* [2. 기본 버튼] 모든 버튼에 먼저 적용 (보라색 - Default) */
+    .stButton > button,
+    div[data-testid="stDialog"] button,
+    div[data-testid="stForm"] button,
+    div[role="dialog"] button {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
-        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
         transition: all 0.2s ease !important;
     }
-    
-    /* Primary 버튼 호버 효과 */
-    .stButton > button[data-testid="baseButton-primary"]:hover,
-    button[data-testid="baseButton-primary"]:hover,
-    div[data-testid="stDialog"] button[data-testid="baseButton-primary"]:hover,
-    div[data-testid="stForm"] button[data-testid="baseButton-primary"]:hover,
-    div[role="dialog"] button[data-testid="baseButton-primary"]:hover,
-    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-primary"]:hover,
-    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-primary"]:hover,
-    div[role="dialog"] form button[type="submit"][data-testid="baseButton-primary"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 12px rgba(239, 68, 68, 0.4) !important;
-        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
-    }
-    
-    /* Primary 버튼 내부 텍스트 색상 강제 */
-    button[data-testid="baseButton-primary"] p,
-    button[data-testid="baseButton-primary"] span,
-    div[data-testid="stDialog"] button[data-testid="baseButton-primary"] p,
-    div[data-testid="stForm"] button[data-testid="baseButton-primary"] p,
-    div[role="dialog"] button[data-testid="baseButton-primary"] p {
+    .stButton > button p,
+    div[data-testid="stDialog"] button p,
+    div[data-testid="stForm"] button p {
         color: #FFFFFF !important;
     }
     
-    /* [3. Secondary 버튼] 수정/취소/정보 등 보조 액션 - 파란색 그라데이션 */
+    /* 기본 버튼 호버 효과 */
+    .stButton > button:hover,
+    div[data-testid="stDialog"] button:hover,
+    div[data-testid="stForm"] button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
+    }
+    
+    /* [3. Secondary 버튼] 파란색 - 수정/취소 (기본 스타일 덮어쓰기) */
     .stButton > button[data-testid="baseButton-secondary"],
     button[data-testid="baseButton-secondary"],
     div[data-testid="stDialog"] button[data-testid="baseButton-secondary"],
     div[data-testid="stForm"] button[data-testid="baseButton-secondary"],
     div[role="dialog"] button[data-testid="baseButton-secondary"],
-    /* form submit button도 포함 */
     div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-secondary"],
     div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-secondary"],
     div[role="dialog"] form button[type="submit"][data-testid="baseButton-secondary"] {
-        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important; /* Blue Gradient */
-        color: #FFFFFF !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important;
         box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3) !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
-    
-    /* Secondary 버튼 호버 효과 */
     .stButton > button[data-testid="baseButton-secondary"]:hover,
     button[data-testid="baseButton-secondary"]:hover,
     div[data-testid="stDialog"] button[data-testid="baseButton-secondary"]:hover,
@@ -164,32 +139,41 @@ st.markdown("""
         box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4) !important;
         background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
     }
-    
-    /* Secondary 버튼 내부 텍스트 색상 강제 */
     button[data-testid="baseButton-secondary"] p,
-    button[data-testid="baseButton-secondary"] span,
     div[data-testid="stDialog"] button[data-testid="baseButton-secondary"] p,
-    div[data-testid="stForm"] button[data-testid="baseButton-secondary"] p,
-    div[role="dialog"] button[data-testid="baseButton-secondary"] p {
+    div[data-testid="stForm"] button[data-testid="baseButton-secondary"] p {
         color: #FFFFFF !important;
     }
     
-    /* [4. 기본 버튼] Primary/Secondary가 아닌 버튼 - 보라색 그라데이션 */
-    .stButton > button:not([data-testid="baseButton-primary"]):not([data-testid="baseButton-secondary"]),
-    button:not([data-testid="baseButton-primary"]):not([data-testid="baseButton-secondary"]):not([type="button"]):not([aria-label*="increment"]):not([aria-label*="decrement"]) {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-        color: #FFFFFF !important;
+    /* [4. Primary 버튼] 빨간색 - 기록/삭제/추가 (가장 높은 우선순위) */
+    .stButton > button[data-testid="baseButton-primary"],
+    button[data-testid="baseButton-primary"],
+    div[data-testid="stDialog"] button[data-testid="baseButton-primary"],
+    div[data-testid="stForm"] button[data-testid="baseButton-primary"],
+    div[role="dialog"] button[data-testid="baseButton-primary"],
+    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-primary"],
+    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-primary"],
+    div[role="dialog"] form button[type="submit"][data-testid="baseButton-primary"] {
+        background: linear-gradient(135deg, #ef4444 0%, #f87171 100%) !important;
+        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3) !important;
         border: none !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease !important;
     }
-    
-    /* 기본 버튼 호버 효과 */
-    .stButton > button:not([data-testid="baseButton-primary"]):not([data-testid="baseButton-secondary"]):hover {
+    .stButton > button[data-testid="baseButton-primary"]:hover,
+    button[data-testid="baseButton-primary"]:hover,
+    div[data-testid="stDialog"] button[data-testid="baseButton-primary"]:hover,
+    div[data-testid="stForm"] button[data-testid="baseButton-primary"]:hover,
+    div[role="dialog"] button[data-testid="baseButton-primary"]:hover,
+    div[data-testid="stDialog"] form button[type="submit"][data-testid="baseButton-primary"]:hover,
+    div[data-testid="stForm"] form button[type="submit"][data-testid="baseButton-primary"]:hover,
+    div[role="dialog"] form button[type="submit"][data-testid="baseButton-primary"]:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
+        box-shadow: 0 6px 12px rgba(239, 68, 68, 0.4) !important;
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+    }
+    button[data-testid="baseButton-primary"] p,
+    div[data-testid="stDialog"] button[data-testid="baseButton-primary"] p,
+    div[data-testid="stForm"] button[data-testid="baseButton-primary"] p {
+        color: #FFFFFF !important;
     }
 
     /* === 6. 사이드바 스타일 === */
@@ -454,12 +438,24 @@ st.markdown("""
         color: #FFFFFF !important;
     }
     
-    /* Dialog 내부 모든 텍스트 - 흰색 (버튼 제외) */
-    div[data-testid="stDialog"] *:not(button):not(button *),
-    div[role="dialog"] *:not(button):not(button *),
-    section[data-testid="stDialog"] *:not(button):not(button *),
-    section[role="dialog"] *:not(button):not(button *) {
+    /* Dialog 내부 모든 텍스트 - 흰색 (버튼과 입력 필드 제외) */
+    div[data-testid="stDialog"] *:not(button):not(button *):not(input):not(input *):not(textarea):not(textarea *),
+    div[role="dialog"] *:not(button):not(button *):not(input):not(input *):not(textarea):not(textarea *),
+    section[data-testid="stDialog"] *:not(button):not(button *):not(input):not(input *):not(textarea):not(textarea *),
+    section[role="dialog"] *:not(button):not(button *):not(input):not(input *):not(textarea):not(textarea *) {
         color: #FFFFFF !important;
+    }
+    
+    /* Dialog 내부 입력 필드 텍스트 색상 강제 (전역 스타일보다 우선) */
+    div[data-testid="stDialog"] input,
+    div[data-testid="stDialog"] textarea,
+    div[data-testid="stDialog"] input *,
+    div[data-testid="stDialog"] textarea *,
+    div[role="dialog"] input,
+    div[role="dialog"] textarea,
+    div[role="dialog"] input *,
+    div[role="dialog"] textarea * {
+        color: #000000 !important;
     }
     
     /* Dialog 내부 제목, 헤더 */
