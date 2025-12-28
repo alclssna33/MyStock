@@ -2345,7 +2345,7 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성 (절대 위치 전략)"""
+                """CSS 오버레이 기법으로 뱃지 생성 (stElementContainer 형제 선택자)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
@@ -2379,53 +2379,39 @@ with tab2:
                     pointer-events: none;
                 ">{name}</div>
                 <style>
-                    /* 컬럼 컨테이너를 position: relative로 설정 */
-                    div[data-testid="column"]:has(#{unique_id}) {{
-                        position: relative !important;
-                    }}
-                    
-                    /* 같은 컬럼 내에서 뱃지 다음에 오는 버튼 찾기 */
-                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] {{
-                        position: absolute !important;
-                        top: 0 !important;
-                        left: 0 !important;
-                        width: 100% !important;
-                        height: 48px !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        z-index: 10 !important;
-                        pointer-events: auto !important;
-                    }}
-                    
-                    /* 버튼 완전히 투명하게 */
-                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] button {{
+                    /* 1. 뱃지가 들어있는 ElementContainer의 '바로 다음' 형제 ElementContainer 찾기 */
+                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button {{
+                        /* 버튼 위치를 강제로 뱃지 위로 끌어올림 */
+                        margin-top: -53px !important; /* 뱃지 높이 + 여백 고려 */
+                        height: 53px !important;
+                        
+                        /* 투명화 및 클릭 영역 확보 */
                         opacity: 0 !important;
                         background: transparent !important;
                         border: none !important;
                         color: transparent !important;
+                        z-index: 10 !important;
                         width: 100% !important;
-                        min-height: 48px !important;
-                        height: 48px !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
                         cursor: pointer !important;
                         position: relative !important;
-                        z-index: 10 !important;
+                        padding: 0 !important;
+                        margin-left: 0 !important;
+                        margin-right: 0 !important;
                         pointer-events: auto !important;
                     }}
                     
-                    /* hover 상태에서도 투명 유지 */
-                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] button:hover {{
-                        opacity: 0 !important;
+                    /* 호버 시에도 투명 유지 */
+                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] button:hover {{
                         background: transparent !important;
                         border: none !important;
+                        opacity: 0 !important;
                     }}
                     
-                    /* 버튼 컨테이너가 공간을 차지하지 않도록 */
-                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] {{
-                        height: 0 !important;
-                        min-height: 0 !important;
-                        overflow: visible !important;
+                    /* 버튼 컨테이너도 조정 (공간 차지 방지) */
+                    div[data-testid="stElementContainer"]:has(#{unique_id}) + div[data-testid="stElementContainer"] {{
+                        margin-top: -53px !important;
+                        position: relative !important;
+                        z-index: 10 !important;
                     }}
                 </style>
                 """, unsafe_allow_html=True)
