@@ -2345,15 +2345,18 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성 (전역 CSS 사용)"""
+                """CSS 오버레이 기법으로 뱃지 생성 (고유 ID + 인라인 CSS)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
                 gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
                 
-                # HTML div로 시각적 뱃지 생성 (전역 CSS가 오버레이 처리)
+                # 고유 ID 생성 (스타일 충돌 방지)
+                unique_id = f"badge-{key.replace('_', '-')}"
+                
+                # HTML과 CSS를 하나의 st.markdown으로 통합 렌더링
                 st.markdown(f"""
-                <div class="badge-overlay-visual" style="
+                <div id="{unique_id}" class="badge-overlay-visual" style="
                     background: {gradient};
                     border: 2px solid {dark_green};
                     border-radius: 12px;
@@ -2375,9 +2378,46 @@ with tab2:
                     user-select: none;
                     pointer-events: none;
                 ">{name}</div>
+                <style>
+                    /* 현재 뱃지(div)의 부모(markdown container)의 바로 다음 형제(button container) 타겟팅 */
+                    div:has(> #{unique_id}) + div[data-testid="stButton"],
+                    div[data-testid="stMarkdownContainer"]:has(#{unique_id}) + div[data-testid="stButton"],
+                    div:has(#{unique_id}) + div[data-testid="stButton"] {{
+                        margin-top: -48px !important;
+                        position: relative !important;
+                        z-index: 10 !important;
+                        pointer-events: auto !important;
+                    }}
+                    /* 버튼 완전히 투명하게 */
+                    div:has(> #{unique_id}) + div[data-testid="stButton"] button,
+                    div[data-testid="stMarkdownContainer"]:has(#{unique_id}) + div[data-testid="stButton"] button,
+                    div:has(#{unique_id}) + div[data-testid="stButton"] button {{
+                        opacity: 0 !important;
+                        background: transparent !important;
+                        border: none !important;
+                        color: transparent !important;
+                        width: 100% !important;
+                        min-height: 48px !important;
+                        height: 48px !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        cursor: pointer !important;
+                        position: relative !important;
+                        z-index: 10 !important;
+                        pointer-events: auto !important;
+                    }}
+                    /* hover 상태에서도 투명 유지 */
+                    div:has(> #{unique_id}) + div[data-testid="stButton"] button:hover,
+                    div[data-testid="stMarkdownContainer"]:has(#{unique_id}) + div[data-testid="stButton"] button:hover,
+                    div:has(#{unique_id}) + div[data-testid="stButton"] button:hover {{
+                        opacity: 0 !important;
+                        background: transparent !important;
+                        border: none !important;
+                    }}
+                </style>
                 """, unsafe_allow_html=True)
                 
-                # 투명 버튼 생성 (전역 CSS가 투명하게 처리)
+                # 투명 버튼 생성
                 if st.button(name, key=key, use_container_width=True):
                     return True
                 return False
