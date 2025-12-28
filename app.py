@@ -78,17 +78,23 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* === 5. 버튼 스타일 === */
-    .stButton > button {
+    /* === 5. 버튼 스타일 (기본 스타일 - 개별 버튼은 아래에서 오버라이드) === */
+    /* 기본 버튼 스타일 (kind나 type이 지정되지 않은 버튼만) */
+    .stButton > button:not([kind="primary"]):not([kind="secondary"]):not([type="submit"]) {
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-        color: #FFFFFF !important; /* 버튼 글씨는 흰색 */
+        color: #FFFFFF !important;
         border: none !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
     }
-    /* 버튼 내부 텍스트 흰색 강제 */
-    .stButton > button p {
+    
+    .stButton > button:not([kind="primary"]):not([kind="secondary"]):not([type="submit"]) p {
         color: #FFFFFF !important;
     }
+    
+    /* 개별 버튼 스타일링을 위해 아래에 필요한 버튼만 추가 */
 
     /* === 6. 사이드바 스타일 === */
     section[data-testid="stSidebar"] {
@@ -110,8 +116,8 @@ st.markdown("""
     section[data-testid="stSidebar"] div[data-baseweb="select"] > div * {
         color: #000000 !important;
     }
-    /* 사이드바 버튼 */
-    section[data-testid="stSidebar"] button {
+    /* 사이드바 버튼 - 기본 스타일 (필요시 개별 오버라이드 가능) */
+    section[data-testid="stSidebar"] button:not([kind="primary"]):not([kind="secondary"]) {
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
         color: #FFFFFF !important;
     }
@@ -275,21 +281,68 @@ st.markdown("""
         background: transparent !important;
     }
     
-    /* 버튼 스타일 개선 */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+    /* === 버튼 개별 스타일링 === */
+    /* 각 버튼을 개별적으로 스타일링할 수 있도록 일괄 적용 제거 */
+    /* 아래에 필요한 버튼만 개별적으로 스타일 지정 */
+    
+    /* 1. 매수 계획 및 기록 테이블의 "수정" 버튼 - 파란색 */
+    /* Dialog 내부의 매수 기록 form에서 "수정" 텍스트를 가진 submit button */
+    div[data-testid="stDialog"] form button[type="submit"][kind="secondary"],
+    div[role="dialog"] form button[type="submit"][kind="secondary"] {
+        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%) !important; /* Blue Gradient */
         color: #FFFFFF !important;
-        border: none !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3) !important;
         border-radius: 6px !important;
-        padding: 0.4rem 1rem !important;
         font-weight: 600 !important;
-        transition: all 0.3s ease !important;
+        transition: all 0.2s ease !important;
     }
     
-    .stButton > button[kind="primary"]:hover {
+    div[data-testid="stDialog"] form button[type="submit"][kind="secondary"]:hover,
+    div[role="dialog"] form button[type="submit"][kind="secondary"]:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
+        box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4) !important;
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
     }
+    
+    div[data-testid="stDialog"] form button[type="submit"][kind="secondary"] p,
+    div[role="dialog"] form button[type="submit"][kind="secondary"] p {
+        color: #FFFFFF !important;
+    }
+    
+    /* 2. 매수 계획 및 기록 테이블의 "기록" 버튼 - 빨간색 */
+    /* Dialog 내부의 매수 기록 form에서 "기록" 텍스트를 가진 submit button */
+    div[data-testid="stDialog"] form button[type="submit"][kind="primary"],
+    div[role="dialog"] form button[type="submit"][kind="primary"] {
+        background: linear-gradient(135deg, #ef4444 0%, #f87171 100%) !important; /* Red Gradient */
+        color: #FFFFFF !important;
+        border: none !important;
+        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3) !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    div[data-testid="stDialog"] form button[type="submit"][kind="primary"]:hover,
+    div[role="dialog"] form button[type="submit"][kind="primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 12px rgba(239, 68, 68, 0.4) !important;
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+    }
+    
+    div[data-testid="stDialog"] form button[type="submit"][kind="primary"] p,
+    div[role="dialog"] form button[type="submit"][kind="primary"] p {
+        color: #FFFFFF !important;
+    }
+    
+    /* 3. 기타 버튼들 - 개별 스타일링 가능 */
+    /* 필요시 아래에 개별 버튼 스타일 추가 */
+    /* 예시:
+    button[key="delete_button"] {
+        background: linear-gradient(135deg, #ef4444 0%, #f87171 100%) !important;
+        color: #FFFFFF !important;
+    }
+    */
     
     /* === 9. Dialog (팝업) 너비 조정 === */
     /* Streamlit Dialog 컨테이너 너비 확장 - 모든 가능한 선택자 */
@@ -432,9 +485,9 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* Dialog 내부 버튼 - 기존 스타일 유지 */
-    div[data-testid="stDialog"] .stButton > button,
-    div[role="dialog"] .stButton > button {
+    /* Dialog 내부 버튼 - 기본 스타일 (primary/secondary/form submit이 아닌 경우만) */
+    div[data-testid="stDialog"] .stButton > button:not([kind="primary"]):not([kind="secondary"]):not([type="submit"]),
+    div[role="dialog"] .stButton > button:not([kind="primary"]):not([kind="secondary"]):not([type="submit"]) {
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
         color: #FFFFFF !important;
     }
@@ -1777,10 +1830,12 @@ with tab2:
                             # 수정/기록 버튼
                             if existing_date or existing_price > 0 or existing_qty > 0:
                                 button_label = "수정"
+                                button_type = "secondary"  # 수정 버튼은 파란색
                             else:
                                 button_label = "기록"
+                                button_type = "primary"  # 기록 버튼은 빨간색
                             
-                            if st.form_submit_button(button_label, type="primary", use_container_width=True):
+                            if st.form_submit_button(button_label, type=button_type, use_container_width=True):
                                 # buy_txs 리스트 확장
                                 while len(buy_txs) < installments:
                                     buy_txs.append(None)
