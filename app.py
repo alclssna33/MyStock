@@ -1005,8 +1005,8 @@ with tab1:
     if df.empty:
         st.info("사이드바에서 종목을 추가해주세요.")
     else:
-        # 상단 컨트롤 바 (5단 구성)
-        col1, col2, col3, col4, col5 = st.columns([1, 1.5, 0.8, 0.8, 1])
+        # 상단 컨트롤 바 (6단 구성 - 투자전략 드롭다운 추가)
+        col1, col2, col3, col4, col5, col6 = st.columns([1, 1.2, 1, 0.8, 0.8, 1])
         
         with col1:
             # 카테고리 선택 (매수종목 / 관심종목)
@@ -1019,6 +1019,25 @@ with tab1:
             )
         
         with col2:
+            # 투자전략 선택 (매수종목 선택 시에만 표시)
+            if category == "매수종목":
+                # 세션 상태 초기화 (카테고리가 변경되면)
+                if 'strategy_select' not in st.session_state or st.session_state.get('prev_category') != category:
+                    st.session_state['strategy_select'] = "Long"
+                    st.session_state['prev_category'] = category
+                
+                strategy = st.selectbox(
+                    "투자전략",
+                    options=["전체", "Long", "Short", "Macro"],
+                    index=1,  # default: Long
+                    key="strategy_select"
+                )
+            else:
+                strategy = "전체"  # 매수종목이 아닐 때는 전체로 설정
+                if 'prev_category' in st.session_state:
+                    st.session_state['prev_category'] = category
+        
+        with col3:
             # 종목 선택
             stock_options = [f"{row['Name']} ({row['Symbol']})" for _, row in df.iterrows()]
             
@@ -1037,7 +1056,13 @@ with tab1:
                     except:
                         pass
                     if has_buy:
-                        filtered_options.append(f"{row['Name']} ({row['Symbol']})")
+                        # 투자전략 필터링 추가
+                        if strategy == "전체":
+                            filtered_options.append(f"{row['Name']} ({row['Symbol']})")
+                        else:
+                            row_category = row.get('Category', '')
+                            if str(row_category).strip() == strategy:
+                                filtered_options.append(f"{row['Name']} ({row['Symbol']})")
                 if filtered_options:
                     stock_options = filtered_options
             elif category == "관심종목":
@@ -1063,7 +1088,7 @@ with tab1:
             
             selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
         
-        with col3:
+        with col4:
             # 시작일
             start_date = st.date_input(
                 "시작일",
@@ -1071,7 +1096,7 @@ with tab1:
                 key="start_date"
             )
         
-        with col4:
+        with col5:
             # 종료일
             end_date = st.date_input(
                 "종료일",
@@ -1079,7 +1104,7 @@ with tab1:
                 key="end_date"
             )
         
-        with col5:
+        with col6:
             # 기간선택 박스
             period_options = {
                 "6개월": 0.5,
@@ -2098,9 +2123,26 @@ with tab2:
     # ==========================================
     # 1. 포트폴리오 요약 및 우측 상단 버튼
     # ==========================================
-    col_header1, col_header2 = st.columns([3, 1])
+    col_header1, col_header2, col_header3 = st.columns([2, 1, 1])
     with col_header1:
         st.subheader("📊 포트폴리오 요약")
+    with col_header2:
+        # 투자전략 필터 (분할매수 플래너)
+        if not df_split.empty:
+            # 세션 상태 초기화
+            if 'split_strategy_filter' not in st.session_state:
+                st.session_state['split_strategy_filter'] = "전체"
+            
+            strategy_filter = st.selectbox(
+                "투자전략 필터",
+                options=["전체", "Long", "Short", "Macro"],
+                index=0,
+                key="split_strategy_filter"
+            )
+            
+            # 투자전략 필터링 적용
+            if strategy_filter != "전체":
+                df_split = df_split[df_split['Category'].astype(str).str.strip() == strategy_filter].copy()
     with col_header2:
         # 우측 상단 버튼 영역
         st.markdown("<br>", unsafe_allow_html=True)  # 여백
@@ -2111,7 +2153,7 @@ with tab2:
                 interest_date = st.date_input("관심일", value=None, key="split_interest_date_input")
                 market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="split_market_cap_input")
                 installments = st.number_input("분할 횟수", min_value=1, value=3, key="split_installments_input")
-                category = st.selectbox("투자 전략", options=["Long", "Short"], key="split_category_input")
+                category = st.selectbox("투자 전략", options=["Long", "Short", "Macro"], key="split_category_input")
                 
                 if st.form_submit_button("계획 추가"):
                     if name and market_cap > 0:
@@ -2186,7 +2228,7 @@ with tab2:
                     
                     market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="import_market_cap")
                     installments = st.number_input("분할 횟수", min_value=1, value=3, key="import_installments")
-                    category = st.selectbox("투자 전략", options=["Long", "Short"], key="import_category")
+                    category = st.selectbox("투자 전략", options=["Long", "Short", "Macro"], key="import_category")
                     
                     if st.form_submit_button("분할 매수 플래너에 추가"):
                         if selected_idx >= 0 and market_cap > 0:
