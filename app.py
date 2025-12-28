@@ -2172,14 +2172,16 @@ with tab2:
                     })
             
             if interest_stocks:
-                interest_options = [f"{s['Name']} ({s['Symbol']})" for s in interest_stocks]
+                # 가나다 순으로 정렬 (종목명 기준)
+                interest_stocks_sorted = sorted(interest_stocks, key=lambda x: x['Name'])
+                interest_options = [f"{s['Name']} ({s['Symbol']})" for s in interest_stocks_sorted]
                 selected_interest = st.selectbox("관심종목 선택", interest_options, key="select_interest_stock")
                 
                 with st.form("import_interest_stock_form"):
                     # 선택된 종목 정보 표시
                     selected_idx = interest_options.index(selected_interest) if selected_interest in interest_options else -1
                     if selected_idx >= 0:
-                        selected_stock = interest_stocks[selected_idx]
+                        selected_stock = interest_stocks_sorted[selected_idx]
                         st.info(f"선택된 종목: {selected_stock['Name']} ({selected_stock['Symbol']})")
                     
                     market_cap = st.number_input("시가총액 (억원)", min_value=0, step=1000, placeholder="예: 5000000", key="import_market_cap")
@@ -2188,7 +2190,7 @@ with tab2:
                     
                     if st.form_submit_button("분할 매수 플래너에 추가"):
                         if selected_idx >= 0 and market_cap > 0:
-                            selected_stock = interest_stocks[selected_idx]
+                            selected_stock = interest_stocks_sorted[selected_idx]
                             # 기존 종목 업데이트
                             all_stocks = load_stocks()
                             mask = all_stocks['Symbol'] == selected_stock['Symbol']
@@ -2556,7 +2558,7 @@ with tab2:
                     }
                     .portfolio-table-header {
                         display: grid;
-                        grid-template-columns: 0.5fr 1.2fr 2fr 2fr 1fr;
+                        grid-template-columns: 0.5fr 1fr 2fr 2fr 1fr;
                         gap: 1rem;
                         padding: 1rem;
                         background: rgba(99, 102, 241, 0.2);
@@ -2622,8 +2624,8 @@ with tab2:
                     """, unsafe_allow_html=True)
                     
                     # 테이블 헤더 (클릭 가능한 정렬 버튼)
-                    # 종목명 가로 길이를 더 줄임 (이수스페셜티케미칼이 한 줄로 표시되도록)
-                    header_cols = st.columns([0.5, 1.2, 2, 2, 1])
+                    # 종목명 가로 길이를 행과 동일하게 맞춤
+                    header_cols = st.columns([0.5, 1, 2, 2, 1])
                     with header_cols[0]:
                         st.markdown("<div style='text-align: center; font-weight: 600; color: #ffffff;'>#</div>", unsafe_allow_html=True)
                     
@@ -2693,28 +2695,71 @@ with tab2:
                             if st.button(name, key=f"stock_link_{stock_id}_{row_idx}", use_container_width=True):
                                 # 종목명 클릭 시 dialog 직접 호출
                                 show_stock_detail_modal(stock_id)
+                            # 종목명 버튼에 고유 클래스 추가를 위한 JavaScript
                             st.markdown(f"""
-                            <style>
-                            button[key="stock_link_{stock_id}_{row_idx}"] {{
-                                background: rgba(16, 185, 129, 0.2) !important;
-                                color: #10b981 !important;
-                                text-decoration: none !important;
-                                font-weight: 500 !important;
-                                border: 1px solid rgba(16, 185, 129, 0.3) !important;
-                                box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1) !important;
-                                border-radius: 6px !important;
-                                padding: 0.4rem 0.6rem !important;
-                                white-space: nowrap !important;
-                                overflow: hidden !important;
-                                text-overflow: ellipsis !important;
-                            }}
-                            button[key="stock_link_{stock_id}_{row_idx}"]:hover {{
-                                background: rgba(16, 185, 129, 0.3) !important;
-                                color: #059669 !important;
-                                border-color: rgba(16, 185, 129, 0.5) !important;
-                                box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2) !important;
-                            }}
-                            </style>
+                            <script>
+                            (function() {{
+                                function styleStockButton() {{
+                                    // 버튼 텍스트로 종목명 버튼 찾기
+                                    const buttons = document.querySelectorAll('.stButton > button');
+                                    buttons.forEach(button => {{
+                                        const buttonText = button.textContent.trim() || 
+                                                         button.querySelector('p')?.textContent.trim() || 
+                                                         button.querySelector('span')?.textContent.trim() || '';
+                                        if (buttonText === '{name}') {{
+                                            // 초록색 스타일 적용
+                                            button.style.cssText = `
+                                                background: rgba(16, 185, 129, 0.2) !important;
+                                                color: #10b981 !important;
+                                                text-decoration: none !important;
+                                                font-weight: 500 !important;
+                                                border: 1px solid rgba(16, 185, 129, 0.3) !important;
+                                                box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1) !important;
+                                                border-radius: 6px !important;
+                                                padding: 0.4rem 0.6rem !important;
+                                                white-space: nowrap !important;
+                                                overflow: hidden !important;
+                                                text-overflow: ellipsis !important;
+                                            `;
+                                            
+                                            // 호버 이벤트
+                                            button.addEventListener('mouseenter', function() {{
+                                                this.style.background = 'rgba(16, 185, 129, 0.3)';
+                                                this.style.color = '#059669';
+                                                this.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                                                this.style.boxShadow = '0 4px 6px rgba(16, 185, 129, 0.2)';
+                                            }});
+                                            button.addEventListener('mouseleave', function() {{
+                                                this.style.background = 'rgba(16, 185, 129, 0.2)';
+                                                this.style.color = '#10b981';
+                                                this.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                                                this.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.1)';
+                                            }});
+                                            
+                                            // 내부 텍스트 색상
+                                            const textElements = button.querySelectorAll('p, span');
+                                            textElements.forEach(el => {{
+                                                el.style.color = '#10b981';
+                                            }});
+                                        }}
+                                    }});
+                                }}
+                                
+                                if (document.readyState === 'loading') {{
+                                    document.addEventListener('DOMContentLoaded', styleStockButton);
+                                }} else {{
+                                    styleStockButton();
+                                }}
+                                
+                                // MutationObserver로 동적 추가 감지
+                                const observer = new MutationObserver(styleStockButton);
+                                observer.observe(document.body, {{ childList: true, subtree: true }});
+                                
+                                // 짧은 지연 후 재시도
+                                setTimeout(styleStockButton, 100);
+                                setTimeout(styleStockButton, 500);
+                            }})();
+                            </script>
                             """, unsafe_allow_html=True)
                         with row_cols[2]:
                             st.markdown(f"<div style='color: #ffffff;'>₩{invested:,.0f} ({percentage:.1f}%)</div>", unsafe_allow_html=True)
