@@ -2345,7 +2345,7 @@ with tab2:
             
             # 오버레이 뱃지 생성 함수
             def create_overlay_badge(name, progress, key):
-                """CSS 오버레이 기법으로 뱃지 생성 (고유 ID + 인라인 CSS)"""
+                """CSS 오버레이 기법으로 뱃지 생성 (절대 위치 전략)"""
                 progress_pct = min(100, max(0, progress))
                 dark_green = '#10b981'
                 light_green = '#86efac'
@@ -2379,19 +2379,26 @@ with tab2:
                     pointer-events: none;
                 ">{name}</div>
                 <style>
-                    /* 현재 뱃지(div)의 부모(markdown container)의 바로 다음 형제(button container) 타겟팅 */
-                    div:has(> #{unique_id}) + div[data-testid="stButton"],
-                    div[data-testid="stMarkdownContainer"]:has(#{unique_id}) + div[data-testid="stButton"],
-                    div:has(#{unique_id}) + div[data-testid="stButton"] {{
-                        margin-top: -48px !important;
+                    /* 컬럼 컨테이너를 position: relative로 설정 */
+                    div[data-testid="column"]:has(#{unique_id}) {{
                         position: relative !important;
+                    }}
+                    
+                    /* 같은 컬럼 내에서 뱃지 다음에 오는 버튼 찾기 */
+                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] {{
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: 48px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                         z-index: 10 !important;
                         pointer-events: auto !important;
                     }}
+                    
                     /* 버튼 완전히 투명하게 */
-                    div:has(> #{unique_id}) + div[data-testid="stButton"] button,
-                    div[data-testid="stMarkdownContainer"]:has(#{unique_id}) + div[data-testid="stButton"] button,
-                    div:has(#{unique_id}) + div[data-testid="stButton"] button {{
+                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] button {{
                         opacity: 0 !important;
                         background: transparent !important;
                         border: none !important;
@@ -2406,13 +2413,19 @@ with tab2:
                         z-index: 10 !important;
                         pointer-events: auto !important;
                     }}
+                    
                     /* hover 상태에서도 투명 유지 */
-                    div:has(> #{unique_id}) + div[data-testid="stButton"] button:hover,
-                    div[data-testid="stMarkdownContainer"]:has(#{unique_id}) + div[data-testid="stButton"] button:hover,
-                    div:has(#{unique_id}) + div[data-testid="stButton"] button:hover {{
+                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] button:hover {{
                         opacity: 0 !important;
                         background: transparent !important;
                         border: none !important;
+                    }}
+                    
+                    /* 버튼 컨테이너가 공간을 차지하지 않도록 */
+                    div[data-testid="column"]:has(#{unique_id}) div[data-testid="stButton"] {{
+                        height: 0 !important;
+                        min-height: 0 !important;
+                        overflow: visible !important;
                     }}
                 </style>
                 """, unsafe_allow_html=True)
