@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
+import FinanceDataReader as fdr
 import plotly.graph_objects as go
 import plotly.express as px
 import os
@@ -754,11 +755,24 @@ def save_stocks(df):
         st.error(f"❌ 데이터 저장 실패: {str(e)}")
         raise
 
-# 주가 데이터 가져오기 (캐싱 + 재시도 로직)
+# 주가 데이터 가져오기 (하이브리드 방식: FinanceDataReader + yfinance)
 @st.cache_data(ttl=7200)  # 2시간 캐싱 (rate limiting 방지)
 def get_stock_data(symbol):
     max_retries = 3
     retry_delay = 2  # 초기 지연 시간 (초)
+    
+    # 1. 한국 종목 코드 정제 (숫자 6자리 추출)
+    clean_symbol = symbol.strip().upper()
+    is_korean = False
+    
+    # .KS, .KQ 제거 후 순수 숫자인지 확인
+    if clean_symbol.endswith('.KS') or clean_symbol.endswith('.KQ'):
+        temp_symbol = clean_symbol.replace('.KS', '').replace('.KQ', '')
+        if temp_symbol.isdigit() and len(temp_symbol) == 6:
+            clean_symbol = temp_symbol
+            is_korean = True
+    elif clean_symbol.isdigit() and len(clean_symbol) == 6:
+        is_korean = True
     
     for attempt in range(max_retries):
         try:
@@ -766,21 +780,65 @@ def get_stock_data(symbol):
             if attempt > 0:
                 time.sleep(retry_delay * (attempt + 1))  # 지수 백오프
             
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="max")
+            df = None
+            
+            # 2. FinanceDataReader 사용 (한국 종목)
+            if is_korean:
+                try:
+                    df = fdr.DataReader(clean_symbol)
+                    # FinanceDataReader는 인덱스가 Date가 아닐 수 있으므로 확인
+                    if df is not None and not df.empty:
+                        # 인덱스 이름이 없거나 다른 경우 'Date'로 설정
+                        if df.index.name is None or df.index.name != 'Date':
+                            df.index.name = 'Date'
+                except Exception as fdr_error:
+                    # FinanceDataReader 실패 시 yfinance로 폴백
+                    df = None
+            
+            # 3. yfinance 사용 (미국 종목 또는 FDR 실패 시)
+            if df is None or df.empty:
+                # yfinance는 .KS/.KQ가 필요할 수 있으므로 원본 symbol 사용 시도
+                ticker = yf.Ticker(symbol)
+                df = ticker.history(period="max")
             
             # 빈 데이터 체크
-            if df.empty:
+            if df is None or df.empty:
                 if attempt < max_retries - 1:
                     continue
                 st.warning(f"{symbol} 종목의 데이터가 비어있습니다. 티커를 확인해주세요.")
                 return None
             
-            # 타임존 정보 제거 (yfinance 데이터의 인덱스에 타임존이 포함되어 있어서 제거)
+            # 4. 데이터 표준화 (차트 호환성 유지)
+            # 인덱스 이름 'Date'로 통일
+            if df.index.name != 'Date':
+                df.index.name = 'Date'
+            
+            # 타임존 제거 (yfinance는 타임존이 있고, fdr은 없을 수 있음)
             if df.index.tz is not None:
                 df.index = df.index.tz_localize(None)
-            # 인덱스를 날짜만 남기고 시간 정보 제거 (정규화)
+            
+            # 날짜 정규화 (시간 제거)
             df.index = pd.to_datetime(df.index).normalize()
+            
+            # 컬럼명 표준화 (대소문자 통일: Open, High, Low, Close, Volume)
+            if not df.empty:
+                column_mapping = {}
+                for col in df.columns:
+                    col_lower = str(col).lower()
+                    if col_lower in ['open', '시가']:
+                        column_mapping[col] = 'Open'
+                    elif col_lower in ['high', '고가']:
+                        column_mapping[col] = 'High'
+                    elif col_lower in ['low', '저가']:
+                        column_mapping[col] = 'Low'
+                    elif col_lower in ['close', '종가']:
+                        column_mapping[col] = 'Close'
+                    elif col_lower in ['volume', '거래량']:
+                        column_mapping[col] = 'Volume'
+                
+                if column_mapping:
+                    df = df.rename(columns=column_mapping)
+            
             return df
             
         except Exception as e:
@@ -804,7 +862,7 @@ def get_stock_data(symbol):
                 continue
             else:
                 st.error(f"❌ {symbol} 종목의 데이터를 가져올 수 없습니다: {str(e)}")
-                st.info("💡 티커 형식을 확인해주세요. 예: AAPL, 005930.KS, TSLA")
+                st.info("💡 티커 형식을 확인해주세요. 예: AAPL, 005930.KS, 570023, TSLA")
                 return None
     
     return None
