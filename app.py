@@ -681,13 +681,21 @@ def init_google_sheet():
         
         # 헤더 확인 및 추가 (통합 구조)
         headers = worksheet.row_values(1)
-        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
+        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
         
         if not headers or headers != expected_columns:
-            # 헤더 업데이트
-            worksheet.clear()
-            worksheet.append_row(expected_columns)
-            st.info("✅ Google Sheets 헤더가 통합 구조로 업데이트되었습니다.")
+            # 헤더 업데이트 (기존 데이터 보존)
+            if headers and len(headers) < len(expected_columns):
+                # 기존 헤더에 없는 컬럼만 추가
+                for col in expected_columns:
+                    if col not in headers:
+                        headers.append(col)
+                worksheet.update('A1', [headers])
+            elif not headers or headers != expected_columns:
+                # 헤더가 완전히 다르면 업데이트
+                worksheet.clear()
+                worksheet.append_row(expected_columns)
+                st.info("✅ Google Sheets 헤더가 통합 구조로 업데이트되었습니다.")
         
         return spreadsheet, worksheet
     except Exception as e:
@@ -708,7 +716,7 @@ def load_stocks():
         
         if not records:
             # 빈 DataFrame 반환 (헤더만 있는 경우)
-            columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
+            columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
             return pd.DataFrame(columns=columns)
         
         # DataFrame으로 변환
@@ -724,7 +732,7 @@ def load_stocks():
     except Exception as e:
         st.error(f"❌ 데이터 로드 실패: {str(e)}")
         # 빈 DataFrame 반환
-        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions"]
+        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
         return pd.DataFrame(columns=columns)
 
 # Google Sheets에 데이터 저장 (통합 시트)
@@ -770,10 +778,16 @@ def get_stock_data(symbol):
     if symbol is None:
         return None
     
-    # symbol을 문자열로 변환
+    # symbol을 문자열로 변환 (0으로 시작하는 종목번호 보존)
     try:
-        symbol = str(symbol).strip()
-        if not symbol:
+        # 숫자로 변환되면 앞의 0이 사라지므로, 먼저 문자열로 변환
+        if isinstance(symbol, (int, float)):
+            # 숫자인 경우 6자리로 패딩 (앞에 0 추가)
+            symbol_str = str(int(symbol)).zfill(6)
+        else:
+            symbol_str = str(symbol).strip()
+        
+        if not symbol_str:
             return None
     except Exception:
         return None
@@ -781,17 +795,26 @@ def get_stock_data(symbol):
     max_retries = 3
     retry_delay = 2  # 초기 지연 시간 (초)
     
-    # 1. 한국 종목 코드 정제 (숫자 6자리 추출)
-    clean_symbol = symbol.upper()
+    # 1. 한국 종목 코드 정제 (숫자 6자리 추출, 앞의 0 보존)
+    clean_symbol = symbol_str.upper()
     is_korean = False
+    market_suffix = None  # .KS 또는 .KQ 저장
     
     # .KS, .KQ 제거 후 순수 숫자인지 확인
     if clean_symbol.endswith('.KS') or clean_symbol.endswith('.KQ'):
+        if clean_symbol.endswith('.KS'):
+            market_suffix = '.KS'
+        elif clean_symbol.endswith('.KQ'):
+            market_suffix = '.KQ'
+        
         temp_symbol = clean_symbol.replace('.KS', '').replace('.KQ', '')
-        if temp_symbol.isdigit() and len(temp_symbol) == 6:
-            clean_symbol = temp_symbol
+        if temp_symbol.isdigit():
+            # 6자리로 패딩 (앞에 0 추가)
+            clean_symbol = temp_symbol.zfill(6)
             is_korean = True
-    elif clean_symbol.isdigit() and len(clean_symbol) == 6:
+    elif clean_symbol.isdigit():
+        # 숫자인 경우 6자리로 패딩
+        clean_symbol = clean_symbol.zfill(6)
         is_korean = True
     
     for attempt in range(max_retries):
@@ -818,8 +841,30 @@ def get_stock_data(symbol):
             # 3. yfinance 사용 (미국 종목 또는 FDR 실패 시)
             if df is None or df.empty:
                 # yfinance는 .KS/.KQ가 필요할 수 있으므로 원본 symbol 사용 시도
-                ticker = yf.Ticker(symbol)
-                df = ticker.history(period="max")
+                # 한국 종목인 경우 접미사 추가
+                yf_symbol = symbol_str
+                if is_korean:
+                    if market_suffix:
+                        # 원본에 접미사가 있었으면 그대로 사용
+                        yf_symbol = clean_symbol + market_suffix
+                        ticker = yf.Ticker(yf_symbol)
+                        df = ticker.history(period="max")
+                    else:
+                        # 접미사가 없으면 FinanceDataReader가 실패했으므로
+                        # .KS와 .KQ를 모두 시도 (먼저 .KS 시도)
+                        yf_symbol = clean_symbol + '.KS'
+                        ticker = yf.Ticker(yf_symbol)
+                        df = ticker.history(period="max")
+                        
+                        # .KS로 실패하면 .KQ 시도
+                        if df is None or df.empty:
+                            yf_symbol = clean_symbol + '.KQ'
+                            ticker = yf.Ticker(yf_symbol)
+                            df = ticker.history(period="max")
+                else:
+                    # 한국 종목이 아니면 원본 그대로 사용
+                    ticker = yf.Ticker(yf_symbol)
+                    df = ticker.history(period="max")
             
             # 빈 데이터 체크
             if df is None or df.empty:
@@ -1192,10 +1237,13 @@ with tab1:
                     if not has_buy and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
                         stock_display = f"{row['Name']} ({row['Symbol']})"
                         filtered_options.append(stock_display)
+                        # ChangeRate 컬럼에서 상승률 가져오기
+                        change_rate = row.get('ChangeRate', None)
                         interest_stocks_data.append({
                             'display': stock_display,
                             'symbol': row['Symbol'],
-                            'name': row['Name']
+                            'name': row['Name'],
+                            'change_rate': change_rate  # Google Sheets의 J열 값
                         })
                 if filtered_options:
                     stock_options = filtered_options
@@ -1238,42 +1286,45 @@ with tab1:
                                 # 캐시된 결과 사용
                                 stock_with_change = st.session_state[cache_key]
                             else:
-                                # 각 종목의 상승률 계산 (지연 시간 추가 및 프로그레스 바)
+                                # Google Sheets의 J열(ChangeRate)에서 상승률 가져오기
                                 stock_with_change = []
-                                total_stocks = len(interest_stocks_data)
                                 
-                                # 프로그레스 바 생성
-                                progress_bar = st.progress(0)
-                                status_text = st.empty()
-                                
-                                for idx, stock_info in enumerate(interest_stocks_data):
-                                    # 진행 상황 업데이트
-                                    progress = (idx + 1) / total_stocks
-                                    progress_bar.progress(progress)
-                                    status_text.text(f"상승률 계산 중... ({idx + 1}/{total_stocks})")
-                                    
+                                for stock_info in interest_stocks_data:
                                     try:
-                                        # stock_info가 딕셔너리이고 필요한 키가 있는지 확인
-                                        if isinstance(stock_info, dict) and 'symbol' in stock_info:
-                                            change_pct = get_daily_change(stock_info['symbol'])
-                                            if change_pct is not None:
-                                                stock_with_change.append({
-                                                    'display': stock_info.get('display', ''),
-                                                    'symbol': stock_info.get('symbol', ''),
-                                                    'name': stock_info.get('name', ''),
-                                                    'change_pct': change_pct
-                                                })
-                                            else:
-                                                # 상승률을 가져올 수 없는 경우도 포함 (하단에 배치)
-                                                stock_with_change.append({
-                                                    'display': stock_info.get('display', ''),
-                                                    'symbol': stock_info.get('symbol', ''),
-                                                    'name': stock_info.get('name', ''),
-                                                    'change_pct': float('-inf')  # 정렬 시 맨 아래로
-                                                })
+                                        # Google Sheets의 ChangeRate 값 사용
+                                        change_rate = stock_info.get('change_rate', None)
+                                        
+                                        # change_rate를 숫자로 변환 시도
+                                        change_pct = None
+                                        if change_rate is not None and pd.notna(change_rate):
+                                            try:
+                                                # 문자열인 경우 숫자로 변환
+                                                if isinstance(change_rate, str):
+                                                    change_rate = change_rate.strip()
+                                                    # % 기호 제거
+                                                    if change_rate.endswith('%'):
+                                                        change_rate = change_rate[:-1]
+                                                    change_pct = float(change_rate)
+                                                else:
+                                                    change_pct = float(change_rate)
+                                            except (ValueError, TypeError):
+                                                change_pct = None
+                                        
+                                        if change_pct is not None:
+                                            stock_with_change.append({
+                                                'display': stock_info.get('display', ''),
+                                                'symbol': stock_info.get('symbol', ''),
+                                                'name': stock_info.get('name', ''),
+                                                'change_pct': change_pct
+                                            })
                                         else:
-                                            # 잘못된 형식의 데이터는 스킵
-                                            continue
+                                            # 상승률이 없는 경우 하단에 배치
+                                            stock_with_change.append({
+                                                'display': stock_info.get('display', ''),
+                                                'symbol': stock_info.get('symbol', ''),
+                                                'name': stock_info.get('name', ''),
+                                                'change_pct': float('-inf')  # 정렬 시 맨 아래로
+                                            })
                                     except Exception as e:
                                         # 에러 발생 시 해당 종목만 스킵
                                         if isinstance(stock_info, dict):
@@ -1283,14 +1334,6 @@ with tab1:
                                                 'name': stock_info.get('name', ''),
                                                 'change_pct': float('-inf')
                                             })
-                                    
-                                    # API 요청 간 지연 시간 추가 (rate limit 방지)
-                                    if idx < total_stocks - 1:  # 마지막 종목이 아닐 때만
-                                        time.sleep(1.5)  # 1.5초로 증가
-                                
-                                # 프로그레스 바 제거
-                                progress_bar.empty()
-                                status_text.empty()
                                 
                                 # 결과를 세션 상태에 저장
                                 st.session_state[cache_key] = stock_with_change
