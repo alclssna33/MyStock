@@ -1220,81 +1220,103 @@ with tab1:
                             del st.session_state['interest_stocks_cache_symbols']
                     
                     if sort_by_change:
-                        # 세션 상태에 결과가 저장되어 있는지 확인
-                        cache_key = f"interest_stocks_change_{len(interest_stocks_data)}"
-                        symbols_key = tuple(sorted([s['symbol'] for s in interest_stocks_data]))
-                        
-                        # 종목 목록이 변경되었는지 확인
-                        if ('interest_stocks_cache_symbols' in st.session_state and 
-                            st.session_state['interest_stocks_cache_symbols'] == symbols_key and
-                            cache_key in st.session_state):
-                            # 캐시된 결과 사용
-                            stock_with_change = st.session_state[cache_key]
+                        # interest_stocks_data가 유효한지 확인
+                        if not interest_stocks_data or len(interest_stocks_data) == 0:
+                            st.warning("관심종목이 없습니다.")
+                            stock_options = sorted(filtered_options) if filtered_options else []
                         else:
-                            # 각 종목의 상승률 계산 (지연 시간 추가 및 프로그레스 바)
-                            stock_with_change = []
-                            total_stocks = len(interest_stocks_data)
+                            # 세션 상태에 결과가 저장되어 있는지 확인
+                            cache_key = f"interest_stocks_change_{len(interest_stocks_data)}"
                             
-                            # 프로그레스 바 생성
-                            progress_bar = st.progress(0)
-                            status_text = st.empty()
+                            # 안전하게 symbols_key 생성
+                            try:
+                                symbols_list = [s.get('symbol', '') for s in interest_stocks_data if isinstance(s, dict) and 'symbol' in s]
+                                symbols_key = tuple(sorted(symbols_list))
+                            except Exception as e:
+                                symbols_key = tuple()
                             
-                            for idx, stock_info in enumerate(interest_stocks_data):
-                                # 진행 상황 업데이트
-                                progress = (idx + 1) / total_stocks
-                                progress_bar.progress(progress)
-                                status_text.text(f"상승률 계산 중... ({idx + 1}/{total_stocks})")
-                                
-                                try:
-                                    change_pct = get_daily_change(stock_info['symbol'])
-                                    if change_pct is not None:
-                                        stock_with_change.append({
-                                            'display': stock_info['display'],
-                                            'symbol': stock_info['symbol'],
-                                            'name': stock_info['name'],
-                                            'change_pct': change_pct
-                                        })
-                                    else:
-                                        # 상승률을 가져올 수 없는 경우도 포함 (하단에 배치)
-                                        stock_with_change.append({
-                                            'display': stock_info['display'],
-                                            'symbol': stock_info['symbol'],
-                                            'name': stock_info['name'],
-                                            'change_pct': float('-inf')  # 정렬 시 맨 아래로
-                                        })
-                                except Exception as e:
-                                    # 에러 발생 시 해당 종목만 스킵
-                                    stock_with_change.append({
-                                        'display': stock_info['display'],
-                                        'symbol': stock_info['symbol'],
-                                        'name': stock_info['name'],
-                                        'change_pct': float('-inf')
-                                    })
-                                
-                                # API 요청 간 지연 시간 추가 (rate limit 방지)
-                                if idx < total_stocks - 1:  # 마지막 종목이 아닐 때만
-                                    time.sleep(0.5)  # 0.5초 지연
-                            
-                            # 프로그레스 바 제거
-                            progress_bar.empty()
-                            status_text.empty()
-                            
-                            # 결과를 세션 상태에 저장
-                            st.session_state[cache_key] = stock_with_change
-                            st.session_state['interest_stocks_cache_symbols'] = symbols_key
-                        
-                        # 상승률순 정렬 (내림차순)
-                        stock_with_change.sort(key=lambda x: x['change_pct'], reverse=True)
-                        
-                        # 상승률 표시 형식으로 변환
-                        stock_options = []
-                        for stock_info in stock_with_change:
-                            if stock_info['change_pct'] != float('-inf'):
-                                change_str = f"{stock_info['change_pct']:+.2f}%"
-                                # 빨간색으로 표시하기 위해 텍스트에 포함
-                                stock_options.append(f"{stock_info['name']} ({stock_info['symbol']}) {change_str}")
+                            # 종목 목록이 변경되었는지 확인
+                            if ('interest_stocks_cache_symbols' in st.session_state and 
+                                st.session_state['interest_stocks_cache_symbols'] == symbols_key and
+                                cache_key in st.session_state):
+                                # 캐시된 결과 사용
+                                stock_with_change = st.session_state[cache_key]
                             else:
-                                stock_options.append(f"{stock_info['name']} ({stock_info['symbol']}) N/A")
+                                # 각 종목의 상승률 계산 (지연 시간 추가 및 프로그레스 바)
+                                stock_with_change = []
+                                total_stocks = len(interest_stocks_data)
+                                
+                                # 프로그레스 바 생성
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                
+                                for idx, stock_info in enumerate(interest_stocks_data):
+                                    # 진행 상황 업데이트
+                                    progress = (idx + 1) / total_stocks
+                                    progress_bar.progress(progress)
+                                    status_text.text(f"상승률 계산 중... ({idx + 1}/{total_stocks})")
+                                    
+                                    try:
+                                        # stock_info가 딕셔너리이고 필요한 키가 있는지 확인
+                                        if isinstance(stock_info, dict) and 'symbol' in stock_info:
+                                            change_pct = get_daily_change(stock_info['symbol'])
+                                            if change_pct is not None:
+                                                stock_with_change.append({
+                                                    'display': stock_info.get('display', ''),
+                                                    'symbol': stock_info.get('symbol', ''),
+                                                    'name': stock_info.get('name', ''),
+                                                    'change_pct': change_pct
+                                                })
+                                            else:
+                                                # 상승률을 가져올 수 없는 경우도 포함 (하단에 배치)
+                                                stock_with_change.append({
+                                                    'display': stock_info.get('display', ''),
+                                                    'symbol': stock_info.get('symbol', ''),
+                                                    'name': stock_info.get('name', ''),
+                                                    'change_pct': float('-inf')  # 정렬 시 맨 아래로
+                                                })
+                                        else:
+                                            # 잘못된 형식의 데이터는 스킵
+                                            continue
+                                    except Exception as e:
+                                        # 에러 발생 시 해당 종목만 스킵
+                                        if isinstance(stock_info, dict):
+                                            stock_with_change.append({
+                                                'display': stock_info.get('display', ''),
+                                                'symbol': stock_info.get('symbol', ''),
+                                                'name': stock_info.get('name', ''),
+                                                'change_pct': float('-inf')
+                                            })
+                                    
+                                    # API 요청 간 지연 시간 추가 (rate limit 방지)
+                                    if idx < total_stocks - 1:  # 마지막 종목이 아닐 때만
+                                        time.sleep(0.5)  # 0.5초 지연
+                                
+                                # 프로그레스 바 제거
+                                progress_bar.empty()
+                                status_text.empty()
+                                
+                                # 결과를 세션 상태에 저장
+                                st.session_state[cache_key] = stock_with_change
+                                st.session_state['interest_stocks_cache_symbols'] = symbols_key
+                            
+                            # 상승률순 정렬 (내림차순)
+                            if stock_with_change:
+                                stock_with_change.sort(key=lambda x: x.get('change_pct', float('-inf')), reverse=True)
+                                
+                                # 상승률 표시 형식으로 변환
+                                stock_options = []
+                                for stock_info in stock_with_change:
+                                    change_pct = stock_info.get('change_pct', float('-inf'))
+                                    if change_pct != float('-inf'):
+                                        change_str = f"{change_pct:+.2f}%"
+                                        # 빨간색으로 표시하기 위해 텍스트에 포함
+                                        stock_options.append(f"{stock_info.get('name', '')} ({stock_info.get('symbol', '')}) {change_str}")
+                                    else:
+                                        stock_options.append(f"{stock_info.get('name', '')} ({stock_info.get('symbol', '')}) N/A")
+                            else:
+                                # stock_with_change가 비어있으면 기본 정렬 사용
+                                stock_options = sorted(filtered_options) if filtered_options else []
                     else:
                         # 가나다순 정렬 (기본값)
                         stock_options = sorted(stock_options)
