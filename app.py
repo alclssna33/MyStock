@@ -6,6 +6,7 @@ import plotly.express as px
 import os
 import time
 import json
+import re
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -889,6 +890,36 @@ def get_stock_data(symbol):
     
     return None
 
+# 당일 상승률 계산 함수
+@st.cache_data(ttl=300)  # 5분 캐싱
+def get_daily_change(symbol):
+    """당일 상승률을 계산합니다."""
+    try:
+        stock_df = get_stock_data(symbol)
+        if stock_df is None or stock_df.empty:
+            return None
+        
+        # 최신 데이터 2개 (당일, 전일)
+        if len(stock_df) < 2:
+            return None
+        
+        latest = stock_df.iloc[-1]
+        previous = stock_df.iloc[-2]
+        
+        if 'Close' not in latest or 'Close' not in previous:
+            return None
+        
+        prev_close = previous['Close']
+        curr_close = latest['Close']
+        
+        if pd.isna(prev_close) or pd.isna(curr_close) or prev_close == 0:
+            return None
+        
+        change_pct = ((curr_close - prev_close) / prev_close) * 100
+        return change_pct
+    except Exception as e:
+        return None
+
 # ==========================================
 # 분할 매수 플래너 관련 함수들
 # ==========================================
@@ -1147,6 +1178,7 @@ with tab1:
                     stock_options = filtered_options
             elif category == "관심종목":
                 filtered_options = []
+                interest_stocks_data = []  # 종목 정보 저장 (상승률 계산용)
                 for idx, row in df.iterrows():
                     # BuyTransactions가 비어있고 InterestDate가 있으면 관심종목
                     buy_txs_str = row.get('BuyTransactions', '[]')
@@ -1159,14 +1191,134 @@ with tab1:
                     except:
                         pass
                     if not has_buy and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
-                        filtered_options.append(f"{row['Name']} ({row['Symbol']})")
+                        stock_display = f"{row['Name']} ({row['Symbol']})"
+                        filtered_options.append(stock_display)
+                        interest_stocks_data.append({
+                            'display': stock_display,
+                            'symbol': row['Symbol'],
+                            'name': row['Name']
+                        })
                 if filtered_options:
                     stock_options = filtered_options
+                    
+                    # 상승률순 정렬 체크박스 (관심종목일 때만 표시)
+                    sort_by_change = st.checkbox("상승률순", key="sort_by_change", value=False)
+                    
+                    if sort_by_change:
+                        # 각 종목의 상승률 계산
+                        stock_with_change = []
+                        for stock_info in interest_stocks_data:
+                            change_pct = get_daily_change(stock_info['symbol'])
+                            if change_pct is not None:
+                                stock_with_change.append({
+                                    'display': stock_info['display'],
+                                    'symbol': stock_info['symbol'],
+                                    'name': stock_info['name'],
+                                    'change_pct': change_pct
+                                })
+                            else:
+                                # 상승률을 가져올 수 없는 경우도 포함 (하단에 배치)
+                                stock_with_change.append({
+                                    'display': stock_info['display'],
+                                    'symbol': stock_info['symbol'],
+                                    'name': stock_info['name'],
+                                    'change_pct': float('-inf')  # 정렬 시 맨 아래로
+                                })
+                        
+                        # 상승률순 정렬 (내림차순)
+                        stock_with_change.sort(key=lambda x: x['change_pct'], reverse=True)
+                        
+                        # 상승률 표시 형식으로 변환
+                        stock_options = []
+                        for stock_info in stock_with_change:
+                            if stock_info['change_pct'] != float('-inf'):
+                                change_str = f"{stock_info['change_pct']:+.2f}%"
+                                # 빨간색으로 표시하기 위해 텍스트에 포함
+                                stock_options.append(f"{stock_info['name']} ({stock_info['symbol']}) {change_str}")
+                            else:
+                                stock_options.append(f"{stock_info['name']} ({stock_info['symbol']}) N/A")
+                    else:
+                        # 가나다순 정렬 (기본값)
+                        stock_options = sorted(stock_options)
             
-            # 가나다순 정렬
-            stock_options = sorted(stock_options)
+            # 가나다순 정렬 (상승률순이 아닐 때만)
+            if category != "관심종목" or not st.session_state.get("sort_by_change", False):
+                stock_options = sorted(stock_options)
             
             selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
+            
+            # 상승률 표시를 위한 CSS 및 JavaScript (selectbox 내부 텍스트 색상 변경)
+            if category == "관심종목" and st.session_state.get("sort_by_change", False):
+                st.markdown("""
+                <style>
+                    /* selectbox 옵션 내 상승률 텍스트 색상 변경을 위한 스타일 */
+                    div[data-baseweb="select"] > div {
+                        color: #000000 !important;
+                    }
+                </style>
+                <script>
+                    // selectbox가 렌더링된 후 상승률 텍스트를 빨간색으로 변경
+                    function updateChangeColor() {
+                        const selectBox = document.querySelector('div[data-baseweb="select"]');
+                        if (selectBox) {
+                            // 드롭다운 메뉴 열기
+                            const popover = document.querySelector('div[data-baseweb="popover"]');
+                            if (popover) {
+                                const options = popover.querySelectorAll('li, div[role="option"]');
+                                options.forEach(function(option) {
+                                    const text = option.textContent || option.innerText;
+                                    // 상승률 패턴 찾기 (+X.XX% 또는 -X.XX%)
+                                    const match = text.match(/([+-]?\\d+\\.\\d+%)/);
+                                    if (match) {
+                                        const originalText = text;
+                                        const changeText = match[1];
+                                        const beforeChange = originalText.substring(0, originalText.indexOf(changeText));
+                                        const afterChange = originalText.substring(originalText.indexOf(changeText) + changeText.length);
+                                        
+                                        // HTML로 변경하여 빨간색 적용
+                                        option.innerHTML = beforeChange + '<span style="color: #ef4444; font-weight: 600;">' + changeText + '</span>' + afterChange;
+                                    }
+                                });
+                            }
+                            
+                            // 선택된 값도 업데이트
+                            const selectedText = selectBox.textContent || selectBox.innerText;
+                            const match = selectedText.match(/([+-]?\\d+\\.\\d+%)/);
+                            if (match) {
+                                const changeText = match[1];
+                                const beforeChange = selectedText.substring(0, selectedText.indexOf(changeText));
+                                const afterChange = selectedText.substring(selectedText.indexOf(changeText) + changeText.length);
+                                // 선택된 값은 직접 수정하기 어려우므로 그대로 둠
+                            }
+                        }
+                    }
+                    
+                    // DOM 로드 후 실행
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', function() {
+                            setTimeout(updateChangeColor, 200);
+                        });
+                    } else {
+                        setTimeout(updateChangeColor, 200);
+                    }
+                    
+                    // MutationObserver로 동적 추가 감지
+                    const observer = new MutationObserver(function(mutations) {
+                        setTimeout(updateChangeColor, 100);
+                    });
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+                    
+                    // selectbox 클릭 시에도 업데이트
+                    document.addEventListener('click', function(e) {
+                        if (e.target.closest('div[data-baseweb="select"]')) {
+                            setTimeout(updateChangeColor, 100);
+                        }
+                    });
+                </script>
+                """, unsafe_allow_html=True)
         
         with col4:
             # 시작일
@@ -1202,7 +1354,12 @@ with tab1:
         
         if selected_stock:
             # 원본 df에서 선택된 종목 찾기
+            # 상승률 텍스트가 포함되어 있을 수 있으므로 제거
             selected_name_symbol = selected_stock
+            # 상승률 패턴 제거 (+X.XX% 또는 -X.XX% 또는 N/A)
+            selected_name_symbol = re.sub(r'\s+[+-]?\d+\.\d+%', '', selected_name_symbol)  # 상승률 제거
+            selected_name_symbol = re.sub(r'\s+N/A', '', selected_name_symbol)  # N/A 제거
+            
             selected_row = None
             for idx, row in df.iterrows():
                 if f"{row['Name']} ({row['Symbol']})" == selected_name_symbol:
