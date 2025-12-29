@@ -768,17 +768,14 @@ def save_stocks(df):
 def get_stock_data(symbol):
     # symbol 유효성 검사
     if symbol is None:
-        st.error("❌ 종목 코드가 제공되지 않았습니다.")
         return None
     
     # symbol을 문자열로 변환
     try:
         symbol = str(symbol).strip()
         if not symbol:
-            st.error("❌ 종목 코드가 비어있습니다.")
             return None
     except Exception:
-        st.error("❌ 종목 코드 형식이 올바르지 않습니다.")
         return None
     
     max_retries = 3
@@ -828,7 +825,7 @@ def get_stock_data(symbol):
             if df is None or df.empty:
                 if attempt < max_retries - 1:
                     continue
-                st.warning(f"{symbol} 종목의 데이터가 비어있습니다. 티커를 확인해주세요.")
+                # 오류 메시지 숨김
                 return None
             
             # 4. 데이터 표준화 (차트 호환성 유지)
@@ -871,12 +868,11 @@ def get_stock_data(symbol):
             if "too many requests" in error_msg or "rate limit" in error_msg or "429" in error_msg:
                 if attempt < max_retries - 1:
                     wait_time = retry_delay * (2 ** attempt)  # 지수 백오프
-                    st.warning(f"요청이 너무 많습니다. {wait_time}초 후 재시도합니다... ({attempt + 1}/{max_retries})")
+                    # 오류 메시지 숨김 (조용히 재시도)
                     time.sleep(wait_time)
                     continue
                 else:
-                    st.error(f"❌ API 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.")
-                    st.info("💡 팁: 잠시 기다린 후 페이지를 새로고침하거나, 다른 종목을 먼저 확인해보세요.")
+                    # 최종 실패 시에도 오류 메시지 숨김
                     return None
             
             # 기타 오류
@@ -884,8 +880,7 @@ def get_stock_data(symbol):
                 time.sleep(retry_delay)
                 continue
             else:
-                st.error(f"❌ {symbol} 종목의 데이터를 가져올 수 없습니다: {str(e)}")
-                st.info("💡 티커 형식을 확인해주세요. 예: AAPL, 005930.KS, 570023, TSLA")
+                # 오류 메시지 숨김
                 return None
     
     return None
@@ -895,8 +890,8 @@ def get_stock_data(symbol):
 def get_daily_change(symbol):
     """당일 상승률을 계산합니다."""
     try:
-        # API 요청 전 짧은 지연 (rate limit 방지)
-        time.sleep(0.3)
+        # API 요청 전 지연 (rate limit 방지)
+        time.sleep(1.0)  # 1초로 증가
         
         stock_df = get_stock_data(symbol)
         if stock_df is None or stock_df.empty:
@@ -1120,7 +1115,8 @@ with tab1:
         st.info("사이드바에서 종목을 추가해주세요.")
     else:
         # 상단 컨트롤 바 (6단 구성 - 투자전략 드롭다운 추가)
-        col1, col2, col3, col4, col5, col6 = st.columns([1, 1.2, 1, 0.8, 0.8, 1])
+        # 종목선택 박스 확대, 기간선택 박스 축소
+        col1, col2, col3, col4, col5, col6 = st.columns([1, 1.2, 1.8, 0.8, 0.8, 0.6])
         
         with col1:
             # 카테고리 선택 (매수종목 / 관심종목)
@@ -1290,7 +1286,7 @@ with tab1:
                                     
                                     # API 요청 간 지연 시간 추가 (rate limit 방지)
                                     if idx < total_stocks - 1:  # 마지막 종목이 아닐 때만
-                                        time.sleep(0.5)  # 0.5초 지연
+                                        time.sleep(1.5)  # 1.5초로 증가
                                 
                                 # 프로그레스 바 제거
                                 progress_bar.empty()
