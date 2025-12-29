@@ -691,11 +691,14 @@ def init_google_sheet():
                     if col not in headers:
                         headers.append(col)
                 worksheet.update('A1', [headers])
-            elif not headers or headers != expected_columns:
-                # 헤더가 완전히 다르면 업데이트
-                worksheet.clear()
-                worksheet.append_row(expected_columns)
-                st.info("✅ Google Sheets 헤더가 통합 구조로 업데이트되었습니다.")
+            elif not headers:
+                # 헤더가 없으면 추가만 (데이터는 보존)
+                worksheet.insert_row(expected_columns, 1)
+            else:
+                # 헤더가 완전히 다르면 경고만 (데이터는 보존)
+                st.warning("⚠️ Google Sheets 헤더가 예상과 다릅니다. 수동으로 확인해주세요.")
+                # 헤더만 업데이트 (데이터는 보존)
+                worksheet.update('A1', [expected_columns])
         
         return spreadsheet, worksheet
     except Exception as e:
@@ -743,6 +746,22 @@ def save_stocks(df):
         spreadsheet = client.open(SPREADSHEET_NAME)
         worksheet = spreadsheet.worksheet("Stocks")
         
+        # 안전장치: df가 비어있으면 저장하지 않음
+        if df.empty:
+            st.warning("⚠️ 저장할 데이터가 없습니다. 데이터가 사라지는 것을 방지하기 위해 저장을 건너뜁니다.")
+            return
+        
+        # 기존 ChangeRate 값 보존 (Symbol 기준)
+        # Apps Script가 업데이트한 최신 ChangeRate 값을 유지하기 위해
+        existing_df = load_stocks()
+        change_rate_map = {}
+        if 'ChangeRate' in existing_df.columns and 'Symbol' in existing_df.columns:
+            for _, row in existing_df.iterrows():
+                symbol = row.get('Symbol', '')
+                change_rate = row.get('ChangeRate', '')
+                if symbol and pd.notna(change_rate) and change_rate != '':
+                    change_rate_map[str(symbol)] = change_rate
+        
         # 빈 값 처리 (pd.NA를 빈 문자열로 변환)
         df = df.fillna("")
         
@@ -756,12 +775,43 @@ def save_stocks(df):
                 lambda x: json.dumps(x) if isinstance(x, (list, dict)) else (x if x else '[]')
             )
         
+        # ChangeRate 컬럼 처리
+        if 'ChangeRate' not in df.columns:
+            df['ChangeRate'] = ""
+        
+        # 기존 ChangeRate 값 복원 (Symbol 기준)
+        # Python에서 수정한 데이터가 있으면 그것을 사용, 없으면 기존 값 유지
+        if 'Symbol' in df.columns:
+            df['ChangeRate'] = df.apply(
+                lambda row: change_rate_map.get(str(row['Symbol']), row.get('ChangeRate', '')),
+                axis=1
+            )
+        
         # 헤더 포함 전체 데이터 준비
         values = [df.columns.tolist()] + df.values.tolist()
         
-        # 기존 데이터 지우고 새 데이터 쓰기
-        worksheet.clear()
-        worksheet.update(values, value_input_option='USER_ENTERED')
+        # 안전장치: values가 비어있거나 헤더만 있으면 저장하지 않음
+        if len(values) <= 1:
+            st.warning("⚠️ 저장할 데이터가 없습니다. 데이터가 사라지는 것을 방지하기 위해 저장을 건너뜁니다.")
+            return
+        
+        # 기존 데이터 지우고 새 데이터 쓰기 (안전하게)
+        try:
+            worksheet.clear()
+            worksheet.update(values, value_input_option='USER_ENTERED')
+        except Exception as update_error:
+            # 업데이트 실패 시 기존 데이터 복원 시도
+            st.error(f"❌ 데이터 저장 중 오류 발생: {str(update_error)}")
+            # 기존 데이터 다시 로드하여 복원 시도
+            if not existing_df.empty:
+                try:
+                    restore_values = [existing_df.columns.tolist()] + existing_df.fillna("").values.tolist()
+                    worksheet.clear()
+                    worksheet.update(restore_values, value_input_option='USER_ENTERED')
+                    st.info("기존 데이터로 복원을 시도했습니다.")
+                except:
+                    pass
+            raise
         
         # 캐시 무효화 (다음 로드 시 최신 데이터 가져오기)
         load_stocks.clear()
@@ -1008,6 +1058,16 @@ def save_split_purchase_data(df):
         # 전체 데이터 로드
         all_df = load_stocks()
         
+        # 기존 ChangeRate 값 보존 (Symbol 기준)
+        # Apps Script가 업데이트한 최신 ChangeRate 값을 유지하기 위해
+        change_rate_map = {}
+        if 'ChangeRate' in all_df.columns and 'Symbol' in all_df.columns:
+            for _, row in all_df.iterrows():
+                symbol = row.get('Symbol', '')
+                change_rate = row.get('ChangeRate', '')
+                if symbol and pd.notna(change_rate) and change_rate != '':
+                    change_rate_map[str(symbol)] = change_rate
+        
         # JSON 컬럼을 문자열로 변환
         df = df.copy()
         if 'BuyTransactions' in df.columns:
@@ -1021,6 +1081,17 @@ def save_split_purchase_data(df):
         
         df = df.fillna("")
         
+        # ChangeRate 컬럼 처리
+        if 'ChangeRate' not in df.columns:
+            df['ChangeRate'] = ""
+        
+        # 기존 ChangeRate 값 복원 (Symbol 기준)
+        if 'Symbol' in df.columns:
+            df['ChangeRate'] = df.apply(
+                lambda row: change_rate_map.get(str(row['Symbol']), row.get('ChangeRate', '')),
+                axis=1
+            )
+        
         # Symbol 기준으로 기존 데이터 업데이트 또는 추가
         for idx, row in df.iterrows():
             symbol = row.get('Symbol', '')
@@ -1028,8 +1099,13 @@ def save_split_purchase_data(df):
                 # 기존 데이터에서 해당 Symbol 찾기
                 mask = all_df['Symbol'] == symbol
                 if mask.any():
-                    # 업데이트
-                    all_df.loc[mask, row.index] = row.values
+                    # 업데이트 (ChangeRate는 보존)
+                    for col in row.index:
+                        if col != 'ChangeRate':  # ChangeRate는 제외하고 업데이트
+                            all_df.loc[mask, col] = row[col]
+                    # ChangeRate가 없거나 비어있으면 기존 값 유지
+                    if 'ChangeRate' in row.index and pd.notna(row.get('ChangeRate', '')) and row.get('ChangeRate', '') != '':
+                        all_df.loc[mask, 'ChangeRate'] = row['ChangeRate']
                 else:
                     # 새 행 추가
                     all_df = pd.concat([all_df, pd.DataFrame([row])], ignore_index=True)
@@ -1037,10 +1113,39 @@ def save_split_purchase_data(df):
         # 빈 값 처리
         all_df = all_df.fillna("")
         
+        # 안전장치: all_df가 비어있으면 저장하지 않음
+        if all_df.empty:
+            st.warning("⚠️ 저장할 데이터가 없습니다. 데이터가 사라지는 것을 방지하기 위해 저장을 건너뜁니다.")
+            return
+        
         # 전체 데이터 저장
         values = [all_df.columns.tolist()] + all_df.values.tolist()
-        ws.clear()
-        ws.update(values, value_input_option='USER_ENTERED')
+        
+        # 안전장치: values가 비어있거나 헤더만 있으면 저장하지 않음
+        if len(values) <= 1:
+            st.warning("⚠️ 저장할 데이터가 없습니다. 데이터가 사라지는 것을 방지하기 위해 저장을 건너뜁니다.")
+            return
+        
+        # 기존 데이터 백업 (복원용)
+        backup_df = all_df.copy()
+        
+        # 전체 데이터 저장 (안전하게)
+        try:
+            ws.clear()
+            ws.update(values, value_input_option='USER_ENTERED')
+        except Exception as update_error:
+            # 업데이트 실패 시 기존 데이터 복원 시도
+            st.error(f"❌ 데이터 저장 중 오류 발생: {str(update_error)}")
+            # 백업 데이터로 복원 시도
+            if not backup_df.empty:
+                try:
+                    restore_values = [backup_df.columns.tolist()] + backup_df.fillna("").values.tolist()
+                    ws.clear()
+                    ws.update(restore_values, value_input_option='USER_ENTERED')
+                    st.info("기존 데이터로 복원을 시도했습니다.")
+                except:
+                    pass
+            raise
         
         # 캐시 무효화
         load_stocks.clear()
