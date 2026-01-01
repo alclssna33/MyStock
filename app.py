@@ -1469,6 +1469,26 @@ with tab1:
             if category != "관심종목" or not st.session_state.get("sort_by_change", False):
                 stock_options = sorted(stock_options)
             
+            # 현재 선택된 종목부터 리스트가 시작되도록 재정렬
+            # 카테고리나 정렬 방식이 변경되면 리셋
+            current_category = st.session_state.get('prev_stock_select_category', '')
+            current_sort = st.session_state.get('prev_stock_select_sort', False)
+            
+            # 카테고리 또는 정렬 방식이 변경되었는지 확인
+            if current_category != category or current_sort != st.session_state.get("sort_by_change", False):
+                # 변경되었으면 이전 선택 초기화
+                st.session_state['prev_stock_select_category'] = category
+                st.session_state['prev_stock_select_sort'] = st.session_state.get("sort_by_change", False)
+            else:
+                # 변경되지 않았으면 현재 선택된 종목 기준으로 재정렬
+                if 'stock_select' in st.session_state and st.session_state['stock_select']:
+                    current_selection = st.session_state['stock_select']
+                    # 현재 선택된 종목이 리스트에 있는지 확인
+                    if current_selection in stock_options:
+                        current_index = stock_options.index(current_selection)
+                        # 리스트 재정렬: 현재 선택 종목부터 시작
+                        stock_options = stock_options[current_index:] + stock_options[:current_index]
+            
             selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
             
             # 상승률 표시를 위한 CSS 및 JavaScript (selectbox 내부 텍스트 색상 변경)
