@@ -127,6 +127,22 @@ st.markdown("""
         flex-direction: column !important;
         justify-content: flex-end !important;
     }
+    
+    /* Radio 버튼 및 Checkbox 높이 조정 */
+    div[role="radiogroup"] {
+        min-height: 38px !important;
+        display: flex !important;
+        align-items: flex-end !important;
+    }
+    
+    /* Checkbox 컨테이너 정렬 */
+    div[data-testid="stCheckbox"] {
+        min-height: 38px !important;
+        display: flex !important;
+        align-items: flex-end !important;
+        padding-bottom: 0 !important;
+    }
+
 
     /* === 5. 버튼 스타일 (수정됨: 실제 DOM 구조에 맞춤) === */
     
@@ -1333,6 +1349,23 @@ with tab1:
                     index=1,  # default: Long
                     key="strategy_select"
                 )
+            elif category == "관심종목":
+                # 관심종목 선택 시 상승률순 체크박스 표시
+                st.write("정렬 옵션")
+                prev_sort_state = st.session_state.get("sort_by_change", False)
+                sort_by_change = st.checkbox("상승률순", key="sort_by_change", value=False)
+                
+                # 체크박스 상태가 변경되면 캐시 초기화
+                if prev_sort_state != sort_by_change:
+                    # 관련 캐시 키들 제거
+                    keys_to_remove = [k for k in st.session_state.keys() if k.startswith("interest_stocks_change_")]
+                    for key in keys_to_remove:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    if 'interest_stocks_cache_symbols' in st.session_state:
+                        del st.session_state['interest_stocks_cache_symbols']
+                
+                strategy = "전체"
             else:
                 strategy = "전체"  # 매수종목이 아닐 때는 전체로 설정
                 if 'prev_category' in st.session_state:
@@ -1394,20 +1427,8 @@ with tab1:
                 if filtered_options:
                     stock_options = filtered_options
                     
-                    # 상승률순 정렬 체크박스 (관심종목일 때만 표시)
-                    # 이전 상태 확인
-                    prev_sort_state = st.session_state.get("sort_by_change", False)
-                    sort_by_change = st.checkbox("상승률순", key="sort_by_change", value=False)
-                    
-                    # 체크박스 상태가 변경되면 캐시 초기화
-                    if prev_sort_state != sort_by_change:
-                        # 관련 캐시 키들 제거
-                        keys_to_remove = [k for k in st.session_state.keys() if k.startswith("interest_stocks_change_")]
-                        for key in keys_to_remove:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        if 'interest_stocks_cache_symbols' in st.session_state:
-                            del st.session_state['interest_stocks_cache_symbols']
+                    # 상승률순 체크박스는 이제 col2에서 처리됨
+                    sort_by_change = st.session_state.get("sort_by_change", False)
                     
                     if sort_by_change:
                         # interest_stocks_data가 유효한지 확인
