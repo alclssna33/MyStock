@@ -86,6 +86,47 @@ st.markdown("""
     div[data-baseweb="calendar"] * {
         color: #000000 !important;
     }
+    
+    /* === 4-1. 입력 필드 높이 통일 (상단 컨트롤 바 정렬) === */
+    /* Selectbox 높이 통일 */
+    div[data-baseweb="select"] > div {
+        min-height: 38px !important;
+        height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    /* Date Input 높이 통일 */
+    input[type="date"],
+    input[type="text"],
+    div[data-baseweb="input"] input {
+        min-height: 38px !important;
+        height: 38px !important;
+        padding: 0 0.75rem !important;
+    }
+    
+    /* Date Input 컨테이너 높이 통일 */
+    div[data-baseweb="input"] {
+        min-height: 38px !important;
+        height: 38px !important;
+    }
+    
+    div[data-baseweb="input"] > div {
+        min-height: 38px !important;
+        height: 38px !important;
+    }
+    
+    /* Label 위치 조정 (모든 입력 필드의 라벨을 상단에 고정) */
+    label {
+        margin-bottom: 0.3rem !important;
+    }
+    
+    /* Streamlit column 내부 컨테이너 정렬 */
+    div[data-testid="column"] > div {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-end !important;
+    }
 
     /* === 5. 버튼 스타일 (수정됨: 실제 DOM 구조에 맞춤) === */
     
@@ -1911,6 +1952,51 @@ with tab1:
                             fillcolor='#00C4FF'
                         )
                     ))
+                    
+                    # 20주 이동평균선 및 80주 이동평균선 계산 및 추가
+                    # 일봉 데이터를 주봉으로 변환 (주 단위로 리샘플링)
+                    try:
+                        # 주봉 데이터로 변환 (W-FRI: 금요일 기준 주봉)
+                        weekly_data = stock_data.resample('W-FRI').agg({
+                            'Open': 'first',
+                            'High': 'max',
+                            'Low': 'min',
+                            'Close': 'last'
+                        }).dropna()
+                        
+                        # 20주 이동평균 계산
+                        if len(weekly_data) >= 20:
+                            ma_20 = weekly_data['Close'].rolling(window=20).mean()
+                            # 일봉 인덱스에 맞춰 보간 (interpolation)
+                            ma_20_daily = ma_20.reindex(stock_data.index, method='ffill')
+                            
+                            fig.add_trace(go.Scatter(
+                                x=stock_data.index,
+                                y=ma_20_daily,
+                                mode='lines',
+                                name='20주 이동평균',
+                                line=dict(color='#FF8C00', width=2),  # 주황색 (DarkOrange)
+                                hovertemplate='20주 MA: %{y:.2f}<extra></extra>'
+                            ))
+                        
+                        # 80주 이동평균 계산
+                        if len(weekly_data) >= 80:
+                            ma_80 = weekly_data['Close'].rolling(window=80).mean()
+                            # 일봉 인덱스에 맞춰 보간 (interpolation)
+                            ma_80_daily = ma_80.reindex(stock_data.index, method='ffill')
+                            
+                            fig.add_trace(go.Scatter(
+                                x=stock_data.index,
+                                y=ma_80_daily,
+                                mode='lines',
+                                name='80주 이동평균',
+                                line=dict(color='#32CD32', width=2),  # 초록색 (LimeGreen)
+                                hovertemplate='80주 MA: %{y:.2f}<extra></extra>'
+                            ))
+                    except Exception as e:
+                        # 이동평균 계산 실패 시 무시 (차트는 정상 표시)
+                        pass
+
                     
                     # 날짜별 주석 추가
                     annotations = []
