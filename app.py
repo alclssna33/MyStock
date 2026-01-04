@@ -1070,6 +1070,53 @@ def get_daily_change(symbol):
     except Exception as e:
         return None
 
+# 주80 이동평균선 조건 체크 함수
+@st.cache_data(ttl=3600)  # 1시간 캐싱
+def check_week80_condition(symbol):
+    """
+    주80 이동평균선과 종가의 이격이 10% 이하인지 확인합니다.
+    (최근 3일 중 하루라도 조건을 만족하면 True)
+    """
+    try:
+        # 일봉 데이터 가져오기 (충분한 기간 확보)
+        df = get_stock_data(symbol)
+        if df is None or df.empty:
+            return False
+            
+        # 주봉으로 리샘플링하여 80주 이동평균선 계산
+        weekly_df = df.resample('W').last()
+        if len(weekly_df) < 80:
+            return False
+            
+        weekly_df['MA80'] = weekly_df['Close'].rolling(window=80).mean()
+        
+        # 최신 MA80 값 구하기 (유효한 마지막 값)
+        ma80 = weekly_df['MA80'].dropna().iloc[-1]
+        
+        if pd.isna(ma80) or ma80 == 0:
+            return False
+            
+        # 최근 3일 일봉 종가와 비교
+        # 최근 3일 데이터 가져오기
+        recent_days = df.iloc[-3:]
+        
+        for _, row in recent_days.iterrows():
+            close_price = row['Close']
+            if pd.isna(close_price) or close_price == 0:
+                continue
+                
+            # 이격도 계산: |종가 - MA80| / MA80
+            divergence = abs(close_price - ma80) / ma80
+            
+            # 이격도가 10% 이하이면 True 반환
+            if divergence <= 0.1:
+                return True
+                
+        return False
+    except Exception as e:
+        # 에러 발생 시 False 처리 (로그는 생략하여 사용자 화면 오염 방지)
+        return False
+
 # ==========================================
 # 분할 매수 플래너 관련 함수들
 # ==========================================
@@ -1350,13 +1397,18 @@ with tab1:
                     key="strategy_select"
                 )
             elif category == "관심종목":
-                # 관심종목 선택 시 상승률순 체크박스 표시
-                st.write("정렬 옵션")
-                prev_sort_state = st.session_state.get("sort_by_change", False)
-                sort_by_change = st.checkbox("상승률순", key="sort_by_change", value=False)
+                # 관심종목 선택 시 정렬/필터 옵션 표시
+                st.write("옵션")
+                col_opt1, col_opt2 = st.columns(2)
+                with col_opt1:
+                    prev_sort_state = st.session_state.get("sort_by_change", False)
+                    sort_by_change = st.checkbox("상승률순", key="sort_by_change", value=False)
+                with col_opt2:
+                    prev_week80_state = st.session_state.get("week80_check", False)
+                    week80_check = st.checkbox("주80", key="week80_check", value=False)
                 
                 # 체크박스 상태가 변경되면 캐시 초기화
-                if prev_sort_state != sort_by_change:
+                if prev_sort_state != sort_by_change or prev_week80_state != week80_check:
                     # 관련 캐시 키들 제거
                     keys_to_remove = [k for k in st.session_state.keys() if k.startswith("interest_stocks_change_")]
                     for key in keys_to_remove:
@@ -1402,6 +1454,10 @@ with tab1:
             elif category == "관심종목":
                 filtered_options = []
                 interest_stocks_data = []  # 종목 정보 저장 (상승률 계산용)
+                
+                # 주80 체크 여부 확인
+                is_week80 = st.session_state.get("week80_check", False)
+                
                 for idx, row in df.iterrows():
                     # BuyTransactions가 비어있고 InterestDate가 있으면 관심종목
                     buy_txs_str = row.get('BuyTransactions', '[]')
@@ -1414,6 +1470,11 @@ with tab1:
                     except:
                         pass
                     if not has_buy and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
+                        # 주80 필터 적용
+                        if is_week80:
+                            if not check_week80_condition(row['Symbol']):
+                                continue
+                                
                         stock_display = f"{row['Name']} ({row['Symbol']})"
                         filtered_options.append(stock_display)
                         # ChangeRate 컬럼에서 상승률 가져오기
