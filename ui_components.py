@@ -2,79 +2,42 @@ import streamlit as st
 import json
 
 def create_overlay_badge(name, progress, key, callback, *args):
-    """CSS 오버레이 기법으로 뱃지 생성 및 클릭 이벤트 처리"""
+    """진행률 그라데이션 배지 버튼 - CSS :has() 선택자로 st.button에 직접 스타일 주입"""
     progress_pct = min(100, max(0, progress))
     dark_green = '#10b981'
     light_green = '#86efac'
     gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
-    
-    unique_id = f"badge-{key.replace('_', '-')}"
-    badge_text_escaped = name.replace("'", "'").replace('"', '"')
-    
+
+    marker_id = f"btn-marker-{key.replace('_', '-')}"
+
+    # 숨겨진 마커 span + CSS :has()로 바로 다음 형제 stElementContainer의 버튼에 그라데이션 주입
     st.markdown(f"""
-    <div id="{unique_id}" class="badge-overlay-visual" style="
-        background: {gradient};
-        border: 2px solid {dark_green};
-        border-radius: 12px;
-        color: #ffffff;
-        font-weight: 600;
-        font-size: 0.95rem;
-        padding: 0.8rem 1.5rem;
-        min-height: 48px;
-        text-align: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Pretendard', sans-serif;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
-        margin-bottom: 0;
-        position: relative;
-        z-index: 1;
-        user-select: none;
-        pointer-events: none;
-    ">{name}</div>
-    <script>
-        (function() {{
-            const badgeId = '{unique_id}';
-            const badgeText = '{badge_text_escaped}';
-            
-            function hideButton() {{
-                const badge = document.getElementById(badgeId);
-                if (!badge) return;
-                
-                let container = badge.closest('[data-testid="stElementContainer"]') || 
-                               badge.closest('[data-testid="stVerticalBlock"]') ||
-                               badge.closest('[data-testid="column"]');
-                if (!container) return;
-                
-                let sibling = container.nextElementSibling;
-                for (let i = 0; i < 5 && sibling; i++) {{
-                    const buttonContainer = sibling.querySelector('[data-testid="stButton"]');
-                    if (buttonContainer) {{
-                        const button = buttonContainer.querySelector('button');
-                        if (button) {{
-                            const buttonText = button.textContent.trim() || 
-                                             button.querySelector('p')?.textContent.trim() || 
-                                             button.querySelector('span')?.textContent.trim() || '';
-                            
-                            if (buttonText === badgeText || buttonText.includes(badgeText)) {{
-                                button.style.cssText = 'opacity: 0 !important; background: transparent !important; border: none !important; color: transparent !important; width: 100% !important; height: 53px !important; min-height: 53px !important; padding: 0 !important; margin: 0 !important; margin-top: -53px !important; cursor: pointer !important; position: relative !important; z-index: 99 !important; pointer-events: auto !important;';
-                                buttonContainer.style.cssText = 'margin-top: -53px !important; position: relative !important; z-index: 99 !important;';
-                                break;
-                            }}
-                        }}
-                    }}
-                    sibling = sibling.nextElementSibling;
-                }}
-            }}
-            setTimeout(hideButton, 100);
-            const observer = new MutationObserver(hideButton);
-            observer.observe(document.body, {{ childList: true, subtree: true }});
-        }})();
-    </script>
+    <span id="{marker_id}" style="display:none;"></span>
+    <style>
+        [data-testid="stElementContainer"]:has(#{marker_id}) + [data-testid="stElementContainer"] [data-testid="stButton"] button,
+        [data-testid="stElementContainer"]:has(#{marker_id}) + [data-testid="stElementContainer"] [data-testid="stButton"] button:focus {{
+            background: {gradient} !important;
+            border: 2px solid {dark_green} !important;
+            border-radius: 12px !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 0.92rem !important;
+            min-height: 52px !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+            transition: all 0.25s ease !important;
+        }}
+        [data-testid="stElementContainer"]:has(#{marker_id}) + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {{
+            opacity: 0.88 !important;
+            box-shadow: 0 6px 16px rgba(16,185,129,0.5) !important;
+            transform: translateY(-1px) !important;
+        }}
+        [data-testid="stElementContainer"]:has(#{marker_id}) + [data-testid="stElementContainer"] [data-testid="stButton"] button p {{
+            color: #ffffff !important;
+            font-weight: 700 !important;
+        }}
+    </style>
     """, unsafe_allow_html=True)
-    
+
     if st.button(name, key=key, use_container_width=True):
         callback(*args)
 

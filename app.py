@@ -1062,8 +1062,8 @@ def render_tracker_tab():
                         xaxis_rangeslider_visible=False,
                         height=620,
                         annotations=annotations,
-                        hovermode='x unified',
-                        dragmode='zoom',
+                        hovermode=False,
+                        dragmode=False,
                         plot_bgcolor='rgba(18, 20, 30, 1)',
                         paper_bgcolor='rgba(24, 26, 38, 1)',
                         font=dict(family='Pretendard', color='#e5e7eb'),
@@ -1081,16 +1081,16 @@ def render_tracker_tab():
                         )
                     )
                     
-                    # 차트 표시 (확대/축소 버튼 포함, 마우스 휠 줌 활성화)
+                    # 차트 표시 (마우스 인터랙션 비활성화)
                     st.plotly_chart(fig, use_container_width=True, config={
-                        'modeBarButtonsToAdd': ['zoomIn2d', 'zoomOut2d', 'resetScale2d', 'pan2d'],
-                        'displayModeBar': True,
+                        'staticPlot': True,
+                        'displayModeBar': False,
                         'displaylogo': False,
-                        'scrollZoom': True,  # 마우스 휠 줌 활성화
+                        'scrollZoom': False,
                         'toImageButtonOptions': {
                             'format': 'png',
                             'filename': f'{name}_{symbol}_chart',
-                            'height': 600,
+                            'height': 620,
                             'width': 1200,
                             'scale': 1
                         }
