@@ -1184,9 +1184,30 @@ def render_planner_tab():
                 portfolio_list = [p for p in portfolio_list if p['strategy'] == split_strategy]
         with ctrl_c2:
             with st.expander("➕ 종목 관리"):
+                # 자동완성 셀렉트박스 — form 외부에 배치해야 선택 즉시 form 필드가 갱신됨
+                # 이름→심볼 매핑 dict (같은 이름이 여러 개일 경우 첫 번째 우선)
+                _name_to_sym = {}
+                for _, r in df_all.iterrows():
+                    _n = str(r.get('Name', '')).strip()
+                    _s = str(r.get('Symbol', '')).strip()
+                    if _n and _s and _s != 'nan' and _n not in _name_to_sym:
+                        _name_to_sym[_n] = _s
+
+                _ac_options = ["직접 입력"] + list(_name_to_sym.keys())
+                _ac_sel = st.selectbox(
+                    "종목 검색 (자동완성)", _ac_options,
+                    key="planner_stock_search",
+                    help="기존 등록 종목에서 검색하거나 '직접 입력' 선택 후 수동 입력"
+                )
+                # 선택된 종목명으로 심볼 조회
+                _pre_sym, _pre_name = "", ""
+                if _ac_sel != "직접 입력":
+                    _pre_name = _ac_sel
+                    _pre_sym = _name_to_sym.get(_ac_sel, "")
+
                 with st.form("quick_add"):
-                    q_symbol = st.text_input("티커 (예: AAPL)")
-                    q_name = st.text_input("종목명")
+                    q_symbol = st.text_input("티커 (예: AAPL)", value=_pre_sym)
+                    q_name = st.text_input("종목명", value=_pre_name)
                     q_mcap = st.number_input("예산(만원)", min_value=0)
                     q_installments = st.number_input("분할횟수", min_value=1, value=3, step=1)
                     q_strategy = st.selectbox("투자전략", ["Long", "Short", "Macro"])
@@ -1201,7 +1222,7 @@ def render_planner_tab():
                                 idx = df_all[dup_mask].index[0]
                                 df_all.at[idx, 'Installments'] = int(q_installments)
                                 df_all.at[idx, 'Category'] = q_strategy
-                                df_all.at[idx, 'MarketCap'] = q_mcap * 100_000_000  # 시총 업데이트 누락 버그 수정
+                                df_all.at[idx, 'MarketCap'] = q_mcap * 100_000_000
                                 existing_name = str(df_all.at[idx, 'Name'])
                                 save_stocks(df_all)
                                 st.success(f"기존 종목 '{existing_name}'을 플래너에 추가했습니다.")
@@ -1291,33 +1312,81 @@ def render_planner_tab():
         with donut_col:
             pie_data = [p for p in portfolio_list if p['invested'] > 0]
             if pie_data:
-                fig_donut = px.pie(pd.DataFrame(pie_data), values='invested', names='name', hole=0.55)
-                fig_donut.update_layout(
-                    paper_bgcolor='rgba(18,20,30,0.75)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='#ffffff', size=14, family='Pretendard'),
-                    title=dict(
-                        text="자산 비중",
-                        font=dict(color='#ffffff', size=16, family='Pretendard'),
-                        x=0.5, xanchor='center', y=0.97
-                    ),
-                    legend=dict(
-                        font=dict(color='#ffffff', size=13, family='Pretendard'),
-                        bgcolor='rgba(255,255,255,0.04)',
-                        bordercolor='rgba(255,255,255,0.1)',
-                        borderwidth=1,
-                        orientation='v',
-                        x=1.02, y=0.5, xanchor='left', yanchor='middle'
-                    ),
-                    margin=dict(l=0, r=90, t=35, b=10),
-                    height=380
+                # 컬럼 전체에 다크 박스 스타일 적용 (CSS marker 트릭)
+                st.markdown(
+                    '<span id="donut-col-bg" style="display:none;"></span>'
+                    '<style>'
+                    '[data-testid="column"]:has(#donut-col-bg) {'
+                    '  background:rgba(18,20,30,0.75) !important;'
+                    '  border:1px solid rgba(255,255,255,0.09) !important;'
+                    '  border-radius:16px !important;'
+                    '  padding:0.8rem 0.6rem 0.6rem 0.6rem !important;'
+                    '}'
+                    '</style>',
+                    unsafe_allow_html=True
                 )
-                fig_donut.update_traces(
-                    textfont=dict(color='#ffffff', size=13, family='Pretendard'),
-                    textinfo='percent+label',
-                    hovertemplate='%{label}<br>₩%{value:,.0f}<br>%{percent}<extra></extra>'
-                )
-                st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+
+                # 전체 필터일 때만 토글 라디오 표시
+                if split_strategy == "전체":
+                    _dv_sel = st.radio(
+                        "차트 기준",
+                        options=["종목별", "전략별"],
+                        index=0,
+                        horizontal=True,
+                        key="donut_view_radio",
+                        label_visibility="collapsed"
+                    )
+                    current_view = 'name' if _dv_sel == "종목별" else 'strategy'
+                else:
+                    current_view = 'name'
+
+                # 차트 데이터 구성
+                _strat_pie_colors = {'Macro': '#8b5cf6', 'Long': '#3b82f6', 'Short': '#ef4444'}
+                if current_view == 'strategy':
+                    strat_pie = []
+                    for _s in ['Macro', 'Long', 'Short']:
+                        _inv = sum(p['invested'] for p in portfolio_list if p['strategy'] == _s and p['invested'] > 0)
+                        if _inv > 0:
+                            strat_pie.append({'name': _s, 'invested': _inv})
+                    chart_df = pd.DataFrame(strat_pie)
+                    color_seq = [_strat_pie_colors[r['name']] for r in strat_pie]
+                    chart_title = "전략별 비중"
+                else:
+                    chart_df = pd.DataFrame(pie_data)
+                    color_seq = None
+                    chart_title = "자산 비중"
+
+                if not chart_df.empty:
+                    fig_donut = px.pie(
+                        chart_df, values='invested', names='name', hole=0.55,
+                        color_discrete_sequence=color_seq if color_seq else None
+                    )
+                    fig_donut.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#ffffff', size=14, family='Pretendard'),
+                        title=dict(
+                            text=chart_title,
+                            font=dict(color='#ffffff', size=16, family='Pretendard'),
+                            x=0.5, xanchor='center', y=0.97
+                        ),
+                        legend=dict(
+                            font=dict(color='#ffffff', size=13, family='Pretendard'),
+                            bgcolor='rgba(255,255,255,0.04)',
+                            bordercolor='rgba(255,255,255,0.1)',
+                            borderwidth=1,
+                            orientation='v',
+                            x=1.02, y=0.5, xanchor='left', yanchor='middle'
+                        ),
+                        margin=dict(l=0, r=90, t=35, b=10),
+                        height=360
+                    )
+                    fig_donut.update_traces(
+                        textfont=dict(color='#ffffff', size=13, family='Pretendard'),
+                        textinfo='percent+label',
+                        hovertemplate='%{label}<br>₩%{value:,.0f}<br>%{percent}<extra></extra>'
+                    )
+                    st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
 
         # 종목 뱃지 그리드 — Macro → Long → Short 순, 전략 내 가나다순
         st.markdown("### 종목별 현황")
