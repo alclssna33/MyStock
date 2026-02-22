@@ -58,7 +58,7 @@ def init_google_sheet():
         
         # 헤더 확인 및 추가 (통합 구조)
         headers = worksheet.row_values(1)
-        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
+        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate", "Week80Gap"]
         
         if not headers or headers != expected_columns:
             # 헤더 업데이트 (기존 데이터 보존)
@@ -96,7 +96,7 @@ def load_stocks():
         all_values = worksheet.get_all_values()
 
         expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap",
-                            "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
+                            "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate", "Week80Gap"]
 
         if len(all_values) <= 1:
             # 헤더만 있거나 완전히 빈 경우
@@ -125,7 +125,7 @@ def load_stocks():
     except Exception as e:
         st.error(f"❌ 데이터 로드 실패: {str(e)}")
         # 빈 DataFrame 반환
-        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
+        columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate", "Week80Gap"]
         return pd.DataFrame(columns=columns)
 
 # Google Sheets에 데이터 저장 (통합 시트)

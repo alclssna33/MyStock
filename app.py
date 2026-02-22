@@ -13,7 +13,7 @@ from database import (
     load_split_purchase_data, save_split_purchase_data
 )
 from stock_utils import (
-    get_stock_data, get_daily_change, check_week80_condition,
+    get_stock_data, get_daily_change, check_week80_condition, get_week80_gap,
     parse_date_safe, find_trading_date
 )
 from ui_components import create_overlay_badge, portfolio_summary_card
@@ -30,6 +30,43 @@ inject_custom_css()
 
 # Google Sheets 초기화
 init_google_sheet()
+
+# 관심종목 주80 이격도 일괄 업데이트 함수
+def update_week80_gaps():
+    """모든 관심종목의 주80 이격도를 계산해 Google Sheets Week80Gap 컬럼에 저장합니다."""
+    try:
+        df = load_stocks()
+        if df.empty:
+            return
+
+        if 'Week80Gap' not in df.columns:
+            df['Week80Gap'] = ""
+
+        updated = False
+        for idx, row in df.iterrows():
+            # 관심종목만 처리 (BuyTransactions 없고 InterestDate 있는 종목)
+            buy_txs_str = row.get('BuyTransactions', '[]')
+            has_buy = False
+            try:
+                if pd.notna(buy_txs_str) and str(buy_txs_str).strip():
+                    buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
+                    if buy_txs and len(buy_txs) > 0:
+                        has_buy = True
+            except Exception:
+                pass
+
+            if not has_buy and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
+                symbol = row.get('Symbol', '')
+                if symbol and pd.notna(symbol):
+                    gap = get_week80_gap(str(symbol).strip())
+                    if gap is not None:
+                        df.at[idx, 'Week80Gap'] = str(gap)
+                        updated = True
+
+        if updated:
+            save_stocks(df)
+    except Exception:
+        pass  # 업데이트 실패 시 앱 동작 중단 없이 계속 진행
 
 # 새 종목 추가 콜백 함수
 def add_stock_callback():
@@ -61,7 +98,8 @@ def add_stock_callback():
                 "Installments": "",  # 관심종목이므로 비워둠
                 "Category": "",  # 관심종목이므로 비워둠
                 "BuyTransactions": "[]",
-                "SellTransactions": "[]"
+                "SellTransactions": "[]",
+                "Week80Gap": ""
             }
             
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
@@ -267,13 +305,31 @@ def show_stock_detail_modal(stock_id):
                     st.rerun(scope="app")
 
     st.divider()
-    if st.button(f"🗑️ {stock_name} 삭제", key=f"del_stock_{stock_id}", type="secondary"):
-        df_all = load_stocks()
-        # 타입 안전 비교 (Symbol이 int로 읽혔을 경우 대비)
-        mask = df_all['Symbol'].astype(str).str.strip() != str(stock_id).strip()
-        df_all = df_all[mask].reset_index(drop=True)
-        save_stocks(df_all)
-        st.rerun(scope="app")
+    col_exit, col_del = st.columns(2)
+
+    with col_exit:
+        if st.button("📤 매도 종료 (관심종목 전환)", key=f"exit_stock_{stock_id}", use_container_width=True):
+            df_all = load_stocks()
+            sym_mask = df_all['Symbol'].astype(str).str.strip() == str(stock_id).strip()
+            if sym_mask.any():
+                idx = df_all[sym_mask].index[0]
+                # 플래너에서 제외: Installments·Category 초기화
+                df_all.at[idx, 'Installments'] = ""
+                df_all.at[idx, 'Category'] = ""
+                # 관심종목 조건 충족: 거래 기록 초기화 + 관심일 갱신
+                df_all.at[idx, 'BuyTransactions'] = "[]"
+                df_all.at[idx, 'SellTransactions'] = "[]"
+                df_all.at[idx, 'InterestDate'] = datetime.now().strftime("%Y-%m-%d")
+                save_stocks(df_all)
+            st.rerun(scope="app")
+
+    with col_del:
+        if st.button(f"🗑️ {stock_name} 삭제", key=f"del_stock_{stock_id}", type="secondary", use_container_width=True):
+            df_all = load_stocks()
+            mask = df_all['Symbol'].astype(str).str.strip() != str(stock_id).strip()
+            df_all = df_all[mask].reset_index(drop=True)
+            save_stocks(df_all)
+            st.rerun(scope="app")
 
 # === Fragment 렌더링 함수 정의 ===
 # 탭별 Fragment로 분리하여 탭 간 상호 재실행 방지
@@ -319,13 +375,20 @@ def render_tracker_tab():
             elif category == "관심종목":
                 # 관심종목 선택 시 정렬/필터 옵션 표시
                 st.write("옵션")
-                col_opt1, col_opt2 = st.columns(2)
+                col_opt1, col_opt2, col_opt3 = st.columns([1, 1, 1.2])
                 with col_opt1:
                     prev_sort_state = st.session_state.get("sort_by_change", False)
                     sort_by_change = st.checkbox("상승률순", key="sort_by_change", value=False)
                 with col_opt2:
                     prev_week80_state = st.session_state.get("week80_check", False)
                     week80_check = st.checkbox("주80", key="week80_check", value=False)
+                with col_opt3:
+                    if week80_check:
+                        if st.button("🔄", key="week80_update_btn", help="주80 이격도 업데이트"):
+                            with st.spinner("업데이트 중..."):
+                                update_week80_gaps()
+                            load_stocks.clear()
+                            st.rerun(scope="fragment")
                 
                 # 체크박스 상태가 변경되면 캐시 초기화
                 if prev_sort_state != sort_by_change or prev_week80_state != week80_check:
@@ -390,20 +453,28 @@ def render_tracker_tab():
                     except:
                         pass
                     if not has_buy and pd.notna(row.get('InterestDate', '')) and str(row.get('InterestDate', '')).strip() != "":
-                        # 주80 필터 적용
+                        # 주80 필터 적용 (저장된 Week80Gap 사용 → 빠른 응답)
                         if is_week80:
-                            if not check_week80_condition(row['Symbol']):
+                            week80_gap_val = row.get('Week80Gap', None)
+                            if week80_gap_val is None or pd.isna(week80_gap_val) or str(week80_gap_val).strip() == '':
+                                continue  # 미계산 종목 제외
+                            try:
+                                if abs(float(str(week80_gap_val).strip())) > 10:
+                                    continue  # 이격도 10% 초과 제외
+                            except (ValueError, TypeError):
                                 continue
-                                
+
                         stock_display = f"{row['Name']} ({row['Symbol']})"
                         filtered_options.append(stock_display)
-                        # ChangeRate 컬럼에서 상승률 가져오기
+                        # ChangeRate 및 Week80Gap 컬럼에서 값 가져오기
                         change_rate = row.get('ChangeRate', None)
+                        week80_gap_stored = row.get('Week80Gap', None)
                         interest_stocks_data.append({
                             'display': stock_display,
                             'symbol': row['Symbol'],
                             'name': row['Name'],
-                            'change_rate': change_rate  # Google Sheets의 J열 값
+                            'change_rate': change_rate,  # Google Sheets의 J열 값
+                            'week80_gap': week80_gap_stored  # Google Sheets의 K열 값
                         })
                 if filtered_options:
                     stock_options = filtered_options
@@ -504,12 +575,37 @@ def render_tracker_tab():
                             else:
                                 # stock_with_change가 비어있으면 기본 정렬 사용
                                 stock_options = sorted(filtered_options) if filtered_options else []
+                    elif is_week80 and interest_stocks_data:
+                        # 주80 이격도 기준 정렬 (절대값 오름차순 - MA80에 가장 가까운 순)
+                        week80_sort = []
+                        for stock_info in interest_stocks_data:
+                            raw_gap = stock_info.get('week80_gap', None)
+                            abs_gap = float('inf')
+                            if raw_gap is not None and pd.notna(raw_gap) and str(raw_gap).strip() != '':
+                                try:
+                                    abs_gap = abs(float(str(raw_gap).strip()))
+                                except (ValueError, TypeError):
+                                    pass
+                            week80_sort.append({'info': stock_info, 'abs_gap': abs_gap})
+                        week80_sort.sort(key=lambda x: x['abs_gap'])
+                        stock_options = []
+                        for item in week80_sort:
+                            si = item['info']
+                            raw_gap = si.get('week80_gap', None)
+                            if raw_gap is not None and pd.notna(raw_gap) and str(raw_gap).strip() != '':
+                                try:
+                                    gap_pct = float(str(raw_gap).strip())
+                                    stock_options.append(f"{si.get('name', '')} ({si.get('symbol', '')}) {gap_pct:+.1f}%")
+                                except (ValueError, TypeError):
+                                    stock_options.append(si.get('display', ''))
+                            else:
+                                stock_options.append(si.get('display', ''))
                     else:
                         # 가나다순 정렬 (기본값)
                         stock_options = sorted(stock_options)
-            
-            # 가나다순 정렬 (상승률순이 아닐 때만)
-            if category != "관심종목" or not st.session_state.get("sort_by_change", False):
+
+            # 가나다순 정렬 (상승률순/주80순이 아닐 때만)
+            if category != "관심종목" or (not st.session_state.get("sort_by_change", False) and not st.session_state.get("week80_check", False)):
                 stock_options = sorted(stock_options)
             
             # 현재 선택된 종목부터 리스트가 시작되도록 재정렬
@@ -1350,9 +1446,10 @@ def render_planner_tab():
                                 st.success(f"'{q_name}' 종목이 추가되었습니다.")
                             st.rerun()
 
-        # 도넛 차트
-        if total_invested > 0:
-            fig_donut = px.pie(pd.DataFrame(portfolio_list), values='invested', names='name', hole=0.6, title="자산 비중")
+        # 도넛 차트 - 필터링 후 portfolio_list 기준으로 재계산 (필터/삭제 후 불일치 방지)
+        pie_data = [p for p in portfolio_list if p['invested'] > 0]
+        if pie_data:
+            fig_donut = px.pie(pd.DataFrame(pie_data), values='invested', names='name', hole=0.6, title="자산 비중")
             fig_donut.update_layout(
                 paper_bgcolor='rgba(46, 46, 46, 0.9)',
                 plot_bgcolor='rgba(0,0,0,0)',

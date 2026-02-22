@@ -158,6 +158,37 @@ def check_week80_condition(symbol):
     except Exception:
         return False
 
+# 주80 이격도 계산 함수 (현재가와 주80선의 이격률)
+@st.cache_data(ttl=3600)  # 1시간 캐싱
+def get_week80_gap(symbol):
+    """주80 이동평균선과 현재가의 이격도(%)를 반환합니다.
+    반환값: (현재가 - 주80선) / 주80선 * 100
+    데이터 부족 시 None 반환
+    """
+    try:
+        df = get_stock_data(symbol)
+        if df is None or df.empty:
+            return None
+
+        weekly_df = df.resample('W').last()
+        if len(weekly_df) < 80:
+            return None
+
+        weekly_df['MA80'] = weekly_df['Close'].rolling(window=80).mean()
+        ma80 = weekly_df['MA80'].dropna().iloc[-1]
+
+        if pd.isna(ma80) or ma80 == 0:
+            return None
+
+        current_price = df['Close'].iloc[-1]
+        if pd.isna(current_price) or current_price == 0:
+            return None
+
+        gap = (current_price - ma80) / ma80 * 100
+        return round(gap, 2)
+    except Exception:
+        return None
+
 # 날짜 문자열을 datetime으로 변환하고 정규화하는 함수
 def parse_date_safe(date_str):
     if pd.isna(date_str) or date_str == "" or str(date_str).strip() == "":
