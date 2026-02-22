@@ -628,7 +628,12 @@ def render_tracker_tab():
                         # 리스트 재정렬: 현재 선택 종목부터 시작
                         stock_options = stock_options[current_index:] + stock_options[:current_index]
             
-            selected_stock = st.selectbox("종목 선택", stock_options, key="stock_select")
+            selected_stock = st.selectbox(
+                "종목 검색/선택",
+                stock_options,
+                key="stock_select",
+                placeholder="종목명 또는 코드 입력..."
+            )
             
             # 상승률 표시를 위한 CSS 및 JavaScript (selectbox 내부 텍스트 색상 변경)
             if category == "관심종목" and st.session_state.get("sort_by_change", False):
@@ -773,227 +778,6 @@ def render_tracker_tab():
                 except:
                     sell_transactions = []
                 
-                # 정보 수정하기 (상단 컨트롤 바 아래 별도 영역)
-                with st.container():
-                    st.markdown("""
-                <style>
-                .edit-container {
-                    background: rgba(255, 255, 255, 0.05);
-                    backdrop-filter: blur(10px);
-                    border-radius: 15px;
-                    padding: 1.5rem;
-                    margin: 1rem 0;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-                }
-                /* 정보 수정하기 Expander - 다크 테마와 어울리는 스타일 */
-                /* JavaScript로 동적 스타일 적용 */
-                <script>
-                function styleEditExpander() {
-                    const expanders = document.querySelectorAll('[data-testid="stExpander"]');
-                    expanders.forEach(expander => {
-                        const header = expander.querySelector('.streamlit-expanderHeader');
-                        if (header && header.textContent.includes('정보 수정하기')) {
-                            header.style.background = 'linear-gradient(135deg, #312e81 0%, #1e1b4b 100%)';
-                            header.style.border = '1px solid rgba(99, 102, 241, 0.3)';
-                            header.style.borderRadius = '15px';
-                            header.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
-                            header.style.color = '#e0e7ff';
-                            header.style.fontWeight = '600';
-                            const headerText = header.querySelectorAll('*');
-                            headerText.forEach(el => {
-                                if (el.tagName !== 'svg') {
-                                    el.style.color = '#e0e7ff';
-                                }
-                            });
-                            const content = expander.querySelector('[data-testid="stExpanderContent"]');
-                            if (content) {
-                                content.style.background = 'rgba(30, 41, 59, 0.4)';
-                                content.style.borderRadius = '0 0 15px 15px';
-                                content.style.padding = '1rem';
-                                content.style.border = '1px solid rgba(99, 102, 241, 0.2)';
-                            }
-                        }
-                    });
-                }
-                // 페이지 로드 시 및 DOM 변경 시 실행
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', styleEditExpander);
-                } else {
-                    styleEditExpander();
-                }
-                // Streamlit의 동적 업데이트를 감지
-                const observer = new MutationObserver(styleEditExpander);
-                observer.observe(document.body, { childList: true, subtree: true });
-                </script>
-                </style>
-                    """, unsafe_allow_html=True)
-                    with st.expander("📝 정보 수정하기", expanded=False):
-                        # 날짜 데이터 변환 (문자열 -> date 객체)
-                        def parse_date(date_str):
-                            if pd.notna(date_str) and date_str != "":
-                                try:
-                                    return pd.to_datetime(date_str).date()
-                                except:
-                                    return None
-                            return None
-                        
-                        edit_interest_date = st.date_input(
-                            "관심일",
-                            value=parse_date(interest_date),
-                            key=f"edit_interest_date_{symbol}"
-                        )
-                        
-                        # 매수일 입력 (BuyTransactions 사용)
-                        st.write("**매수일**")
-                        buy_date_inputs = []
-                        buy_date_count = len(buy_transactions) if buy_transactions else 1
-                        if buy_date_count == 0:
-                            buy_date_count = 1
-                        
-                        # 세션 상태로 매수일 개수 관리
-                        if f'buy_date_count_{symbol}' not in st.session_state:
-                            st.session_state[f'buy_date_count_{symbol}'] = max(buy_date_count, 1)
-                        
-                        for i in range(st.session_state[f'buy_date_count_{symbol}']):
-                            col_date, col_delete = st.columns([4, 1])
-                            with col_date:
-                                tx = buy_transactions[i] if i < len(buy_transactions) else {}
-                                tx_date = tx.get('date', '') if isinstance(tx, dict) else ''
-                                buy_date_inputs.append(st.date_input(
-                                    f"매수일 {i+1}",
-                                    value=parse_date(tx_date) if tx_date else None,
-                                    key=f"edit_buy_date_{i}_{symbol}",
-                                    label_visibility="collapsed"
-                                ))
-                            with col_delete:
-                                if st.button("🗑️", key=f"delete_buy_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                    # BuyTransactions에서 해당 항목 삭제
-                                    df_stocks = load_stocks()
-                                    mask = df_stocks['Symbol'] == symbol
-                                    if mask.any():
-                                        try:
-                                            buy_txs_str = df_stocks.loc[mask, 'BuyTransactions'].values[0]
-                                            buy_txs = json.loads(buy_txs_str) if isinstance(buy_txs_str, str) else buy_txs_str
-                                            if i < len(buy_txs):
-                                                buy_txs.pop(i)
-                                            df_stocks.loc[mask, 'BuyTransactions'] = json.dumps(buy_txs)
-                                            save_stocks(df_stocks)
-                                            st.success("삭제되었습니다!")
-                                            time.sleep(0.5)
-                                        except:
-                                            pass
-                                    # 개수 조정
-                                    if st.session_state[f'buy_date_count_{symbol}'] > 0:
-                                        st.session_state[f'buy_date_count_{symbol}'] -= 1
-                                    if st.session_state[f'buy_date_count_{symbol}'] == 0:
-                                        st.session_state[f'buy_date_count_{symbol}'] = 1
-                                    st.rerun()
-                        
-                        # 매수일 추가 버튼
-                        if st.button("➕ 매수일 추가", key=f"add_buy_date_{symbol}"):
-                            if st.session_state[f'buy_date_count_{symbol}'] < 10:
-                                st.session_state[f'buy_date_count_{symbol}'] += 1
-                                st.rerun()
-                            else:
-                                st.warning("최대 10개까지 추가 가능합니다.")
-                        
-                        # 매도일 입력 (SellTransactions 사용)
-                        st.write("**매도일**")
-                        sell_date_inputs = []
-                        sell_date_count = len(sell_transactions) if sell_transactions else 1
-                        if sell_date_count == 0:
-                            sell_date_count = 1
-                        
-                        # 세션 상태로 매도일 개수 관리
-                        if f'sell_date_count_{symbol}' not in st.session_state:
-                            st.session_state[f'sell_date_count_{symbol}'] = max(sell_date_count, 1)
-                        
-                        for i in range(st.session_state[f'sell_date_count_{symbol}']):
-                            col_date, col_delete = st.columns([4, 1])
-                            with col_date:
-                                tx = sell_transactions[i] if i < len(sell_transactions) else {}
-                                tx_date = tx.get('date', '') if isinstance(tx, dict) else ''
-                                sell_date_inputs.append(st.date_input(
-                                    f"매도일 {i+1}",
-                                    value=parse_date(tx_date) if tx_date else None,
-                                    key=f"edit_sell_date_{i}_{symbol}",
-                                    label_visibility="collapsed"
-                                ))
-                            with col_delete:
-                                if st.button("🗑️", key=f"delete_sell_date_{i}_{symbol}", help="삭제", type="secondary"):
-                                    # SellTransactions에서 해당 항목 삭제
-                                    df_stocks = load_stocks()
-                                    mask = df_stocks['Symbol'] == symbol
-                                    if mask.any():
-                                        try:
-                                            sell_txs_str = df_stocks.loc[mask, 'SellTransactions'].values[0]
-                                            sell_txs = json.loads(sell_txs_str) if isinstance(sell_txs_str, str) else sell_txs_str
-                                            if i < len(sell_txs):
-                                                sell_txs.pop(i)
-                                            df_stocks.loc[mask, 'SellTransactions'] = json.dumps(sell_txs)
-                                            save_stocks(df_stocks)
-                                            st.success("삭제되었습니다!")
-                                            time.sleep(0.5)
-                                        except:
-                                            pass
-                                    # 개수 조정
-                                    if st.session_state[f'sell_date_count_{symbol}'] > 0:
-                                        st.session_state[f'sell_date_count_{symbol}'] -= 1
-                                    if st.session_state[f'sell_date_count_{symbol}'] == 0:
-                                        st.session_state[f'sell_date_count_{symbol}'] = 1
-                                    st.rerun()
-                        
-                        # 매도일 추가 버튼
-                        if st.button("➕ 매도일 추가", key=f"add_sell_date_{symbol}"):
-                            if st.session_state[f'sell_date_count_{symbol}'] < 10:
-                                st.session_state[f'sell_date_count_{symbol}'] += 1
-                                st.rerun()
-                            else:
-                                st.warning("최대 10개까지 추가 가능합니다.")
-                        
-                        edit_note = st.text_area(
-                            "메모",
-                            value=note if pd.notna(note) else "",
-                            key=f"edit_note_{symbol}"
-                        )
-                        
-                        edit_submitted = st.button("수정 저장", key="edit_submit_button")
-                        
-                        if edit_submitted:
-                            df_stocks = load_stocks()
-                            # Symbol 기준으로 해당 종목 찾아서 업데이트
-                            mask = df_stocks['Symbol'] == symbol
-                            if mask.any():
-                                df_stocks.loc[mask, 'InterestDate'] = edit_interest_date.strftime("%Y-%m-%d") if edit_interest_date else ""
-                                
-                                # BuyTransactions 저장 (날짜만 있는 경우 기본값으로 저장)
-                                buy_txs_to_save = []
-                                for d in buy_date_inputs:
-                                    if d is not None:
-                                        buy_txs_to_save.append({
-                                            "date": d.strftime("%Y-%m-%d"),
-                                            "price": 0,
-                                            "quantity": 0
-                                        })
-                                df_stocks.loc[mask, 'BuyTransactions'] = json.dumps(buy_txs_to_save) if buy_txs_to_save else "[]"
-                                
-                                # SellTransactions 저장 (날짜만 있는 경우 기본값으로 저장)
-                                sell_txs_to_save = []
-                                for d in sell_date_inputs:
-                                    if d is not None:
-                                        sell_txs_to_save.append({
-                                            "date": d.strftime("%Y-%m-%d"),
-                                            "price": 0,
-                                            "quantity": 0
-                                        })
-                                df_stocks.loc[mask, 'SellTransactions'] = json.dumps(sell_txs_to_save) if sell_txs_to_save else "[]"
-                                
-                                df_stocks.loc[mask, 'Note'] = edit_note if edit_note else ""
-                                save_stocks(df_stocks)
-                                st.success("수정되었습니다!")
-                                st.rerun()
-                
                 # 주가 데이터 가져오기
                 with st.spinner(f"{name} ({symbol}) 데이터를 불러오는 중..."):
                     stock_data_full = get_stock_data(symbol)
@@ -1031,22 +815,9 @@ def render_tracker_tab():
                         cutoff_date = stock_data_full.index.max() - timedelta(days=5 * 365)
                         stock_data = stock_data_full[stock_data_full.index >= cutoff_date].copy()
                     
-                    # --- 종목 요약 메트릭 ---
+                    # --- 캔들스틱 차트 ---
                     st.markdown('<div class="content-card">', unsafe_allow_html=True)
-                    latest_close = stock_data['Close'].iloc[-1]
-                    if len(stock_data) > 1:
-                        prev_close = stock_data['Close'].iloc[-2]
-                        delta = latest_close - prev_close
-                        delta_pct = (delta / prev_close) * 100
-                    else:
-                        delta, delta_pct = 0, 0
-                    
-                    m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("현재가", f"₩{latest_close:,.0f}", f"{delta:,.0f} ({delta_pct:.2f}%)")
-                    m2.metric("최고가 (기간내)", f"₩{stock_data['High'].max():,.0f}")
-                    m3.metric("최저가 (기간내)", f"₩{stock_data['Low'].min():,.0f}")
-                    m4.metric("거래량", f"{stock_data['Volume'].iloc[-1]:,.0f}")
-                    
+
                     # 캔들스틱 차트 생성
                     fig = go.Figure()
                     
@@ -1059,12 +830,12 @@ def render_tracker_tab():
                         close=stock_data['Close'],
                         name="주가",
                         increasing=dict(
-                            line=dict(color='#FF2E2E'),  # 상승: 빨강
-                            fillcolor='#FF2E2E'
+                            line=dict(color='#FF4444', width=1),  # 상승: 빨강
+                            fillcolor='#FF4444'
                         ),
                         decreasing=dict(
-                            line=dict(color='#00C4FF'),  # 하락: 파랑
-                            fillcolor='#00C4FF'
+                            line=dict(color='#4499FF', width=1),  # 하락: 파랑
+                            fillcolor='#4499FF'
                         )
                     ))
                     
@@ -1082,31 +853,27 @@ def render_tracker_tab():
                         # 20주 이동평균 계산
                         if len(weekly_data) >= 20:
                             ma_20 = weekly_data['Close'].rolling(window=20).mean()
-                            # 일봉 인덱스에 맞춰 보간 (interpolation)
                             ma_20_daily = ma_20.reindex(stock_data.index, method='ffill')
-                            
                             fig.add_trace(go.Scatter(
                                 x=stock_data.index,
                                 y=ma_20_daily,
                                 mode='lines',
-                                name='20주 이동평균',
-                                line=dict(color='#FF8C00', width=2),  # 주황색 (DarkOrange)
-                                hovertemplate='20주 MA: %{y:.2f}<extra></extra>'
+                                name='20주 MA',
+                                line=dict(color='#FFB347', width=1.8),  # 밝은 주황
+                                hovertemplate='20주 MA: %{y:,.0f}<extra></extra>'
                             ))
-                        
+
                         # 80주 이동평균 계산
                         if len(weekly_data) >= 80:
                             ma_80 = weekly_data['Close'].rolling(window=80).mean()
-                            # 일봉 인덱스에 맞춰 보간 (interpolation)
                             ma_80_daily = ma_80.reindex(stock_data.index, method='ffill')
-                            
                             fig.add_trace(go.Scatter(
                                 x=stock_data.index,
                                 y=ma_80_daily,
                                 mode='lines',
-                                name='80주 이동평균',
-                                line=dict(color='#32CD32', width=2),  # 초록색 (LimeGreen)
-                                hovertemplate='80주 MA: %{y:.2f}<extra></extra>'
+                                name='80주 MA',
+                                line=dict(color='#00E5A0', width=2),  # 밝은 민트
+                                hovertemplate='80주 MA: %{y:,.0f}<extra></extra>'
                             ))
                     except Exception as e:
                         # 이동평균 계산 실패 시 무시 (차트는 정상 표시)
@@ -1274,44 +1041,43 @@ def render_tracker_tab():
                             xanchor='center'
                         ),
                         xaxis=dict(
-                            title=dict(
-                                text="날짜",
-                                font=dict(color='#e5e7eb', size=14, family='Pretendard')
-                            ),
-                            tickfont=dict(color='#9ca3af', size=12),
-                            gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
+                            tickfont=dict(color='#b0b8c8', size=11),
+                            gridcolor='rgba(90, 100, 130, 0.35)',
                             gridwidth=1,
                             showgrid=True,
                             zeroline=False,
-                            linecolor='rgba(255, 255, 255, 0.1)',
+                            linecolor='rgba(255, 255, 255, 0.15)',
                             linewidth=1
                         ),
                         yaxis=dict(
-                            title=dict(
-                                text="가격",
-                                font=dict(color='#e5e7eb', size=14, family='Pretendard')
-                            ),
-                            tickfont=dict(color='#9ca3af', size=12),
-                            gridcolor='rgba(128, 128, 128, 0.1)',  # 연한 회색 그리드
+                            tickfont=dict(color='#b0b8c8', size=11),
+                            gridcolor='rgba(90, 100, 130, 0.35)',
                             gridwidth=1,
                             showgrid=True,
                             zeroline=False,
-                            linecolor='rgba(255, 255, 255, 0.1)',
-                            linewidth=1
+                            linecolor='rgba(255, 255, 255, 0.15)',
+                            linewidth=1,
+                            tickformat=',d'
                         ),
                         xaxis_rangeslider_visible=False,
-                        height=600,
+                        height=620,
                         annotations=annotations,
                         hovermode='x unified',
                         dragmode='zoom',
-                        plot_bgcolor='rgba(0, 0, 0, 0)',
-                        paper_bgcolor='rgba(0, 0, 0, 0)',
+                        plot_bgcolor='rgba(18, 20, 30, 1)',
+                        paper_bgcolor='rgba(24, 26, 38, 1)',
                         font=dict(family='Pretendard', color='#e5e7eb'),
+                        margin=dict(l=60, r=20, t=60, b=40),
                         legend=dict(
-                            bgcolor='rgba(0, 0, 0, 0)',
-                            bordercolor='rgba(255, 255, 255, 0.1)',
+                            bgcolor='rgba(30, 33, 50, 0.85)',
+                            bordercolor='rgba(120, 130, 180, 0.3)',
                             borderwidth=1,
-                            font=dict(color='#e5e7eb', size=12)
+                            font=dict(color='#e0e6ff', size=12),
+                            orientation='h',
+                            yanchor='bottom',
+                            y=1.01,
+                            xanchor='left',
+                            x=0
                         )
                     )
                     

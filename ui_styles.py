@@ -117,6 +117,12 @@ def inject_custom_css():
         align-items: flex-end !important;
         padding-bottom: 0 !important;
     }
+    /* 체크박스 라벨 줄바꿈 방지 */
+    div[data-testid="stCheckbox"] label,
+    div[data-testid="stCheckbox"] p {
+        white-space: nowrap !important;
+        overflow: visible !important;
+    }
 
 
     /* === 5. 버튼 스타일 (수정됨: 실제 DOM 구조에 맞춤) === */
