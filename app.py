@@ -1152,26 +1152,27 @@ def render_planner_tab():
             total_invested += current_invested
             total_budget += m_cap
 
-        # 헤더 렌더링
-        col_h1, col_h2, col_h3 = st.columns([2, 1, 1])
-        with col_h1:
-            st.subheader("📊 포트폴리오 요약")
-            c_s1, c_s2 = st.columns(2)
-            with c_s1: portfolio_summary_card("총 예산", total_budget)
-            with c_s2: portfolio_summary_card("진행률", (total_invested / total_budget * 100) if total_budget > 0 else 0, is_percent=True)
-        
-        with col_h2:
-            st.write("") # 여백
-            st.write("")
+        # 전략별 통계 계산 (필터 적용 전 — 전체 기준)
+        _strat_colors = {'Long': '#3b82f6', 'Short': '#ef4444', 'Macro': '#8b5cf6'}
+        _strategy_stats = {}
+        for _s in ['Long', 'Short', 'Macro']:
+            _pts = [p for p in portfolio_list if p['strategy'] == _s]
+            _b = sum(p['budget'] for p in _pts)
+            _i = sum(p['invested'] for p in _pts)
+            _strategy_stats[_s] = {
+                'budget': _b, 'invested': _i,
+                'progress': (_i / _b * 100) if _b > 0 else 0,
+                'count': len(_pts)
+            }
+
+        # 컨트롤 행 (필터 + 종목 관리)
+        ctrl_c1, ctrl_c2 = st.columns([1, 1])
+        with ctrl_c1:
             split_strategy = st.selectbox("투자전략 필터", ["전체", "Long", "Short", "Macro"], key="split_filter")
             if split_strategy != "전체":
                 portfolio_list = [p for p in portfolio_list if p['strategy'] == split_strategy]
-        
-        with col_h3:
-            st.write("") # 여백
-            st.write("")
+        with ctrl_c2:
             with st.expander("➕ 종목 관리"):
-                # 간단한 추가 폼
                 with st.form("quick_add"):
                     q_symbol = st.text_input("티커 (예: AAPL)")
                     q_name = st.text_input("종목명")
@@ -1180,17 +1181,12 @@ def render_planner_tab():
                     q_strategy = st.selectbox("투자전략", ["Long", "Short", "Macro"])
                     if st.form_submit_button("추가"):
                         if q_symbol and q_name:
-                            # Symbol 정규화 (숫자만인 경우 6자리 0패딩)
                             q_sym_norm = q_symbol.strip().upper()
                             if q_sym_norm.isdigit():
                                 q_sym_norm = q_sym_norm.zfill(6)
-
-                            # 기존 종목 중복 확인 (관심종목 포함)
                             existing_symbols = df_all['Symbol'].astype(str).str.strip().str.upper()
                             dup_mask = existing_symbols == q_sym_norm
-
                             if dup_mask.any():
-                                # 기존 종목 활용: Installments와 Category(투자전략)만 업데이트
                                 idx = df_all[dup_mask].index[0]
                                 df_all.at[idx, 'Installments'] = int(q_installments)
                                 df_all.at[idx, 'Category'] = q_strategy
@@ -1198,7 +1194,6 @@ def render_planner_tab():
                                 save_stocks(df_all)
                                 st.success(f"기존 종목 '{existing_name}'을 플래너에 추가했습니다.")
                             else:
-                                # 완전히 새로운 종목 추가
                                 new_stock = {
                                     "Symbol": q_sym_norm,
                                     "Name": q_name,
@@ -1212,31 +1207,116 @@ def render_planner_tab():
                                 st.success(f"'{q_name}' 종목이 추가되었습니다.")
                             st.rerun()
 
-        # 도넛 차트 - 필터링 후 portfolio_list 기준으로 재계산 (필터/삭제 후 불일치 방지)
-        pie_data = [p for p in portfolio_list if p['invested'] > 0]
-        if pie_data:
-            fig_donut = px.pie(pd.DataFrame(pie_data), values='invested', names='name', hole=0.6, title="자산 비중")
-            fig_donut.update_layout(
-                paper_bgcolor='rgba(46, 46, 46, 0.9)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#ffffff', size=13, family='Pretendard'),
-                title=dict(
-                    text="자산 비중",
-                    font=dict(color='#ffffff', size=16, family='Pretendard'),
-                    x=0.5, xanchor='center'
-                ),
-                legend=dict(
+        # 대시보드 + 도넛 차트 (2열)
+        dash_col, donut_col = st.columns([1.5, 1])
+
+        with dash_col:
+            def _fmt(v):
+                if v >= 100_000_000: return f"₩{v / 100_000_000:.1f}억"
+                elif v >= 10_000: return f"₩{v / 10_000:.0f}만"
+                else: return f"₩{v:,.0f}"
+
+            def _bar_color(pct):
+                if pct >= 80: return '#10b981'
+                elif pct >= 50: return '#6366f1'
+                return '#f59e0b'
+
+            total_pct = (total_invested / total_budget * 100) if total_budget > 0 else 0
+            total_bc = _bar_color(total_pct)
+
+            # 전략별 행 HTML 생성
+            strat_html = ""
+            for _s in ['Long', 'Short', 'Macro']:
+                ss = _strategy_stats[_s]
+                if ss['count'] == 0:
+                    continue
+                sc = _strat_colors[_s]
+                sp = ss['progress']
+                bc = _bar_color(sp)
+                strat_html += f"""
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="min-width:62px;text-align:center;background:{sc};border-radius:20px;
+                                padding:3px 10px;font-size:0.68rem;font-weight:700;color:#fff;
+                                white-space:nowrap;letter-spacing:0.02em;">
+                        {_s} <span style="opacity:0.65;">×{ss['count']}</span>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+                            <span style="color:rgba(255,255,255,0.45);font-size:0.69rem;">
+                                {_fmt(ss['invested'])} <span style="opacity:0.6;">/ {_fmt(ss['budget'])}</span>
+                            </span>
+                            <span style="color:{bc};font-weight:700;font-size:0.8rem;">{sp:.1f}%</span>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.1);border-radius:100px;height:5px;overflow:hidden;">
+                            <div style="background:{bc};width:{min(100, sp):.1f}%;height:100%;
+                                        border-radius:100px;box-shadow:0 0 5px {bc}99;"></div>
+                        </div>
+                    </div>
+                </div>"""
+
+            st.markdown(f"""
+            <div style="background:rgba(18,20,30,0.75);border:1px solid rgba(255,255,255,0.09);
+                        border-radius:16px;padding:1.3rem 1.5rem;height:100%;box-sizing:border-box;">
+
+                <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);letter-spacing:0.12em;
+                            text-transform:uppercase;margin-bottom:1.1rem;">📊 포트폴리오 요약</div>
+
+                <!-- 전체 -->
+                <div style="margin-bottom:1.2rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+                        <span style="font-weight:700;font-size:0.95rem;color:#fff;">전체</span>
+                        <div style="text-align:right;">
+                            <span style="color:{total_bc};font-weight:800;font-size:1.25rem;">{total_pct:.1f}%</span>
+                            <span style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-left:7px;">{_fmt(total_invested)} 투자</span>
+                        </div>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.28);font-size:0.68rem;margin-bottom:7px;">
+                        예산 {_fmt(total_budget)}
+                    </div>
+                    <div style="background:rgba(255,255,255,0.1);border-radius:100px;height:9px;overflow:hidden;">
+                        <div style="background:linear-gradient(90deg,{total_bc},{total_bc}bb);
+                                    width:{min(100, total_pct):.1f}%;height:100%;border-radius:100px;
+                                    box-shadow:0 0 10px {total_bc}55;transition:width 0.4s ease;"></div>
+                    </div>
+                </div>
+
+                <div style="border-top:1px solid rgba(255,255,255,0.07);margin:0 0 1rem 0;"></div>
+
+                <!-- 전략별 -->
+                {strat_html}
+            </div>
+            """, unsafe_allow_html=True)
+
+        with donut_col:
+            pie_data = [p for p in portfolio_list if p['invested'] > 0]
+            if pie_data:
+                fig_donut = px.pie(pd.DataFrame(pie_data), values='invested', names='name', hole=0.55)
+                fig_donut.update_layout(
+                    paper_bgcolor='rgba(18,20,30,0.75)',
+                    plot_bgcolor='rgba(0,0,0,0)',
                     font=dict(color='#ffffff', size=12, family='Pretendard'),
-                    bgcolor='rgba(255,255,255,0.05)',
-                    bordercolor='rgba(255,255,255,0.15)',
-                    borderwidth=1,
+                    title=dict(
+                        text="자산 비중",
+                        font=dict(color='#ffffff', size=14, family='Pretendard'),
+                        x=0.5, xanchor='center', y=0.97
+                    ),
+                    legend=dict(
+                        font=dict(color='#ffffff', size=11, family='Pretendard'),
+                        bgcolor='rgba(255,255,255,0.04)',
+                        bordercolor='rgba(255,255,255,0.1)',
+                        borderwidth=1,
+                        orientation='v',
+                        x=1.02, y=0.5, xanchor='left', yanchor='middle'
+                    ),
+                    margin=dict(l=0, r=80, t=30, b=0),
+                    height=280
                 )
-            )
-            fig_donut.update_traces(
-                textfont=dict(color='#ffffff', size=13),
-                textinfo='percent+label'
-            )
-            st.plotly_chart(fig_donut, use_container_width=True)
+                fig_donut.update_traces(
+                    textfont=dict(color='#ffffff', size=11),
+                    textinfo='percent',
+                    hovertemplate='%{label}<br>₩%{value:,.0f}<br>%{percent}<extra></extra>'
+                )
+                st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
 
         # 종목 뱃지 그리드
         st.markdown("### 종목별 현황")

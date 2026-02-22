@@ -1,5 +1,6 @@
 import streamlit as st
 import json
+import re
 
 def create_overlay_badge(name, progress, key, callback, *args):
     """진행률 그라데이션 배지 버튼 - CSS :has() 선택자로 st.button에 직접 스타일 주입"""
@@ -8,7 +9,8 @@ def create_overlay_badge(name, progress, key, callback, *args):
     light_green = '#86efac'
     gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
 
-    marker_id = f"btn-marker-{key.replace('_', '-')}"
+    # CSS ID에 안전한 문자만 허용 (점·슬래시 등 특수문자 → 하이픈)
+    marker_id = "btn-marker-" + re.sub(r'[^a-zA-Z0-9\-]', '-', key)
 
     # 숨겨진 마커 span + CSS :has()로 바로 다음 형제 stElementContainer의 버튼에 그라데이션 주입
     st.markdown(f"""
