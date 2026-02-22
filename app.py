@@ -1321,10 +1321,54 @@ with tab2:
             with cols[i % 6]:
                 create_overlay_badge(p['name'], p['progress'], f"badge_{p['id']}", show_stock_detail_modal, p['id'])
 
-        # 전체 현황판 테이블
+        # 전체 현황판 - 카드 그리드 형태
         with st.expander("📋 전체 현황판", expanded=True):
             pdf = pd.DataFrame(sorted_portfolio)
             if not pdf.empty:
-                pdf['invested_display'] = pdf['invested'].apply(lambda x: f"₩{x:,.0f}")
-                pdf['progress_display'] = pdf['progress'].apply(lambda x: f"{x:.2f}%")
-                st.dataframe(pdf[['name', 'strategy', 'invested_display', 'progress_display']], use_container_width=True)
+                strategy_color_map = {'Long': '#3b82f6', 'Short': '#ef4444', 'Macro': '#8b5cf6'}
+
+                card_parts = ['<div class="portfolio-card-grid">']
+                for _, row in pdf.iterrows():
+                    progress_val = min(100, max(0, float(row['progress'])))
+                    strategy = str(row.get('strategy', 'Long'))
+                    strategy_color = strategy_color_map.get(strategy, '#6b7280')
+
+                    # 진행률에 따른 색상
+                    if progress_val >= 80:
+                        bar_color = '#10b981'
+                        bar_glow = 'rgba(16, 185, 129, 0.45)'
+                    elif progress_val >= 50:
+                        bar_color = '#6366f1'
+                        bar_glow = 'rgba(99, 102, 241, 0.45)'
+                    else:
+                        bar_color = '#f59e0b'
+                        bar_glow = 'rgba(245, 158, 11, 0.45)'
+
+                    budget_display = f"₩{row['budget']:,.0f}" if row['budget'] > 0 else "미설정"
+
+                    card_parts.append(f"""
+                    <div class="portfolio-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.9rem;">
+                            <span style="color:#ffffff; font-weight:700; font-size:1rem; letter-spacing:-0.01em;">{row['name']}</span>
+                            <span style="background:{strategy_color}; color:#fff; padding:0.15rem 0.65rem; border-radius:20px; font-size:0.72rem; font-weight:700; letter-spacing:0.03em; text-transform:uppercase;">{strategy}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+                            <span style="color:rgba(255,255,255,0.45); font-size:0.78rem;">투자금액</span>
+                            <span style="color:rgba(255,255,255,0.45); font-size:0.78rem;">예산</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
+                            <span style="color:#ffffff; font-size:0.95rem; font-weight:600;">₩{row['invested']:,.0f}</span>
+                            <span style="color:rgba(255,255,255,0.6); font-size:0.9rem;">{budget_display}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                            <span style="color:rgba(255,255,255,0.45); font-size:0.78rem;">매수 진행률</span>
+                            <span style="color:{bar_color}; font-weight:700; font-size:0.92rem;">{progress_val:.1f}%</span>
+                        </div>
+                        <div class="progress-bar-track">
+                            <div style="background:linear-gradient(90deg, {bar_color}, {bar_color}99); width:{progress_val:.2f}%; height:100%; border-radius:100px; box-shadow:0 0 8px {bar_glow};"></div>
+                        </div>
+                    </div>
+                    """)
+
+                card_parts.append('</div>')
+                st.markdown('\n'.join(card_parts), unsafe_allow_html=True)

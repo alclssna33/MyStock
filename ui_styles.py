@@ -292,23 +292,8 @@ def inject_custom_css():
         color: #FFFFFF !important;
     }
 
-    /* === 7. '정보 수정하기' Expander 스타일 === */
-    .streamlit-expanderHeader {
-        background: linear-gradient(135deg, #FFF9C4 0%, #FFE082 100%) !important;
-        border: 2px solid #FFD54F !important;
-        border-radius: 10px !important;
-        color: #5D4037 !important;
-    }
-    .streamlit-expanderHeader p, 
-    .streamlit-expanderHeader span,
-    .streamlit-expanderHeader svg {
-        color: #5D4037 !important;
-        fill: #5D4037 !important;
-    }
-    [data-testid="stExpanderDetails"] {
-        background: rgba(255, 249, 196, 0.1) !important;
-        border: 1px solid #FFD54F !important;
-    }
+    /* === 7. '정보 수정하기' Expander 스타일 (레거시 - 16번 섹션으로 대체됨) === */
+    /* 이전 .streamlit-expanderHeader 스타일은 16번 섹션 [data-testid="stExpander"]로 대체 */
     
     /* === 8. 매수 계획 테이블 스타일 === */
     /* 날짜 입력 필드 스타일 */
@@ -675,6 +660,147 @@ def inject_custom_css():
         padding: 1.5rem;
         border: 1px solid rgba(255, 255, 255, 0.05);
         margin-bottom: 1.5rem;
+    }
+
+    /* === 13. 탭(Tab) 스타일 === */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 0.3rem !important;
+        gap: 0.3rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: rgba(255, 255, 255, 0.55) !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        border: none !important;
+        background: transparent !important;
+        padding: 0.5rem 1.5rem !important;
+        transition: all 0.2s ease !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #ffffff !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] span {
+        color: #ffffff !important;
+    }
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span {
+        color: inherit !important;
+    }
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+
+    /* === 14. Metric 델타 색상 보존 === */
+    /* 상승 델타 (초록) */
+    [data-testid="stMetricDelta"] svg[data-testid="stMetricDeltaIcon-Up"],
+    [data-testid="stMetricDeltaIcon-Up"] {
+        color: #10b981 !important;
+        fill: #10b981 !important;
+    }
+    /* 하락 델타 (빨강) */
+    [data-testid="stMetricDelta"] svg[data-testid="stMetricDeltaIcon-Down"],
+    [data-testid="stMetricDeltaIcon-Down"] {
+        color: #ef4444 !important;
+        fill: #ef4444 !important;
+    }
+    /* Metric 컨테이너 전체 */
+    [data-testid="stMetricValue"] > div,
+    [data-testid="stMetricValue"] label,
+    [data-testid="stMetricLabel"] > div,
+    [data-testid="stMetricLabel"] label {
+        color: #ffffff !important;
+    }
+    /* Metric delta 텍스트 - Streamlit inline style 우선 적용 */
+    [data-testid="stMetricDelta"] > div {
+        /* color는 override하지 않음 - inline style이 적용됨 */
+        font-weight: 600 !important;
+    }
+
+    /* === 15. Alert / 알림 메시지 스타일 === */
+    /* Success */
+    [data-testid="stAlert"][data-baseweb="notification"] {
+        border-radius: 10px !important;
+    }
+    div[data-testid="stAlert"] {
+        border-radius: 10px !important;
+    }
+    /* 알림 메시지 내부 텍스트 - 배경에 따라 자동 처리 */
+    div[data-testid="stAlert"] p,
+    div[data-testid="stAlert"] span:not(svg span) {
+        color: inherit !important;
+    }
+
+    /* === 16. Expander 스타일 (data-testid 기반 - 최신 Streamlit) === */
+    [data-testid="stExpander"] {
+        border: 1px solid rgba(99, 102, 241, 0.3) !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        background: rgba(20, 25, 50, 0.5) !important;
+        margin-bottom: 0.8rem !important;
+    }
+    /* Expander 헤더 (summary 태그) */
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] > details > summary {
+        background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%) !important;
+        padding: 0.9rem 1.2rem !important;
+        border-radius: 12px !important;
+    }
+    [data-testid="stExpander"] summary:hover,
+    [data-testid="stExpander"] > details[open] > summary {
+        background: linear-gradient(135deg, #3730a3 0%, #312e81 100%) !important;
+    }
+    [data-testid="stExpander"] summary p,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary div {
+        color: #e0e7ff !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stExpander"] summary svg {
+        fill: #e0e7ff !important;
+        color: #e0e7ff !important;
+    }
+    /* Expander 내용 영역 */
+    [data-testid="stExpanderDetails"] {
+        background: rgba(30, 41, 59, 0.3) !important;
+        border-top: 1px solid rgba(99, 102, 241, 0.2) !important;
+        padding: 1rem !important;
+    }
+
+    /* === 17. 현황판 카드 스타일 === */
+    .portfolio-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1rem;
+        padding: 0.5rem 0;
+    }
+    .portfolio-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 1.3rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .portfolio-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .progress-bar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 100px;
+        height: 10px;
+        overflow: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
