@@ -1237,9 +1237,13 @@ def render_tracker_tab():
                     st.error(f"{symbol} 종목의 데이터를 가져올 수 없습니다. 티커를 확인해주세요.")
 
 
-@st.fragment
 def render_planner_tab():
-    """탭2: 분할 매수 플래너 - 독립 실행 Fragment"""
+    """탭2: 분할 매수 플래너
+
+    NOTE: @st.fragment 미적용 - Streamlit 제약으로 Fragment 내부에서
+    @st.dialog 함수(show_stock_detail_modal)를 콜백으로 호출 불가.
+    render_tracker_tab만 Fragment로 유지.
+    """
     st.title("💰 주식 분할 매수 플래너")
     
     df_all = load_stocks()
@@ -1301,12 +1305,22 @@ def render_planner_tab():
             with st.expander("➕ 종목 관리"):
                 # 간단한 추가 폼
                 with st.form("quick_add"):
-                    q_symbol = st.text_input("티커")
+                    q_symbol = st.text_input("티커 (예: AAPL)")
                     q_name = st.text_input("종목명")
                     q_mcap = st.number_input("시총(억원)", min_value=0)
+                    q_installments = st.number_input("분할횟수", min_value=1, value=3, step=1)
+                    q_strategy = st.selectbox("투자전략", ["Long", "Short", "Macro"])
                     if st.form_submit_button("추가"):
                         if q_symbol and q_name:
-                            new_stock = {"Symbol": q_symbol.upper(), "Name": q_name, "MarketCap": q_mcap * 100000000, "Installments": 3, "Category": "Long", "BuyTransactions": "[]", "SellTransactions": "[]"}
+                            new_stock = {
+                                "Symbol": q_symbol.strip().upper(),
+                                "Name": q_name,
+                                "MarketCap": q_mcap * 100000000,
+                                "Installments": int(q_installments),
+                                "Category": q_strategy,
+                                "BuyTransactions": "[]",
+                                "SellTransactions": "[]"
+                            }
                             save_stocks(pd.concat([df_all, pd.DataFrame([new_stock])], ignore_index=True))
                             st.rerun()
 
