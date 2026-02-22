@@ -1218,8 +1218,8 @@ def render_planner_tab():
                                 st.success(f"'{q_name}' 종목이 추가되었습니다.")
                             st.rerun()
 
-        # 대시보드 + 도넛 차트 (2열)
-        dash_col, donut_col = st.columns([1.5, 1])
+        # 대시보드 + 도넛 차트 (2열) — 도넛이 메인이므로 오른쪽을 더 넓게
+        dash_col, donut_col = st.columns([1, 1.8])
 
         with dash_col:
             total_pct = (total_invested / total_budget * 100) if total_budget > 0 else 0
@@ -1229,9 +1229,9 @@ def render_planner_tab():
             total_invested_str = _fmt(total_invested)
             total_budget_str = _fmt(total_budget)
 
-            # 전략별 행 HTML 생성
+            # 전략별 행 HTML 생성 (Macro → Long → Short 순)
             strat_html = ""
-            for _s in ['Long', 'Short', 'Macro']:
+            for _s in ['Macro', 'Long', 'Short']:
                 ss = _strategy_stats[_s]
                 if ss['count'] == 0:
                     continue
@@ -1244,44 +1244,42 @@ def render_planner_tab():
                 bud_str = _fmt(ss['budget'])
                 count = ss['count']
                 strat_html += (
-                    f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-                    f'<div style="min-width:62px;text-align:center;background:{sc};border-radius:20px;'
-                    f'padding:3px 10px;font-size:0.68rem;font-weight:700;color:#fff;'
+                    f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+                    f'<div style="min-width:72px;text-align:center;background:{sc};border-radius:20px;'
+                    f'padding:4px 10px;font-size:0.8rem;font-weight:700;color:#fff;'
                     f'white-space:nowrap;letter-spacing:0.02em;">'
                     f'{_s} <span style="opacity:0.65;">x{count}</span></div>'
                     f'<div style="flex:1;">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">'
-                    f'<span style="color:rgba(255,255,255,0.45);font-size:0.69rem;">'
-                    f'{inv_str} <span style="opacity:0.6;">/ {bud_str}</span></span>'
-                    f'<span style="color:{bc};font-weight:700;font-size:0.8rem;">{sp_str}%</span>'
+                    f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">'
+                    f'<span style="color:rgba(255,255,255,0.6);font-size:0.8rem;font-weight:600;">'
+                    f'{inv_str} <span style="opacity:0.6;font-size:0.75rem;">/ {bud_str}</span></span>'
+                    f'<span style="color:{bc};font-weight:800;font-size:0.95rem;">{sp_str}%</span>'
                     f'</div>'
-                    f'<div style="background:rgba(255,255,255,0.1);border-radius:100px;height:5px;overflow:hidden;">'
+                    f'<div style="background:rgba(255,255,255,0.12);border-radius:100px;height:7px;overflow:hidden;">'
                     f'<div style="background:{bc};width:{sp_capped}%;height:100%;'
-                    f'border-radius:100px;box-shadow:0 0 5px {bc}99;"></div>'
+                    f'border-radius:100px;box-shadow:0 0 6px {bc}99;"></div>'
                     f'</div></div></div>'
                 )
 
-            # 전체 HTML을 하나의 변수로 조립한 뒤 단 한 번만 st.markdown() 호출
-            # (두 번 나눠 호출하면 각 호출이 별도 DOM 컨테이너가 되어 div가 올바르게 닫히지 않음)
             dashboard_html = (
                 '<div style="background:rgba(18,20,30,0.75);border:1px solid rgba(255,255,255,0.09);'
-                'border-radius:16px;padding:1.3rem 1.5rem;box-sizing:border-box;">'
-                '<div style="font-size:0.68rem;color:rgba(255,255,255,0.35);letter-spacing:0.12em;'
-                'text-transform:uppercase;margin-bottom:1.1rem;">📊 포트폴리오 요약</div>'
-                '<div style="margin-bottom:1.2rem;">'
-                '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">'
-                '<span style="font-weight:700;font-size:0.95rem;color:#fff;">전체</span>'
+                'border-radius:16px;padding:1.4rem 1.6rem;box-sizing:border-box;">'
+                '<div style="font-size:0.78rem;color:rgba(255,255,255,0.45);letter-spacing:0.1em;'
+                'text-transform:uppercase;font-weight:600;margin-bottom:1.2rem;">📊 포트폴리오 요약</div>'
+                '<div style="margin-bottom:1.4rem;">'
+                '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">'
+                '<span style="font-weight:700;font-size:1.05rem;color:#fff;">전체</span>'
                 f'<div style="text-align:right;">'
-                f'<span style="color:{total_bc};font-weight:800;font-size:1.25rem;">{total_pct_str}%</span>'
-                f'<span style="color:rgba(255,255,255,0.4);font-size:0.72rem;margin-left:7px;">{total_invested_str} 투자</span>'
+                f'<span style="color:{total_bc};font-weight:800;font-size:1.5rem;">{total_pct_str}%</span>'
+                f'<span style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-left:8px;">{total_invested_str} 투자</span>'
                 f'</div></div>'
-                f'<div style="color:rgba(255,255,255,0.28);font-size:0.68rem;margin-bottom:7px;">예산 {total_budget_str}</div>'
-                f'<div style="background:rgba(255,255,255,0.1);border-radius:100px;height:9px;overflow:hidden;">'
+                f'<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;font-weight:500;margin-bottom:8px;">예산 {total_budget_str}</div>'
+                f'<div style="background:rgba(255,255,255,0.12);border-radius:100px;height:11px;overflow:hidden;">'
                 f'<div style="background:linear-gradient(90deg,{total_bc},{total_bc}bb);'
                 f'width:{total_pct_capped_str}%;height:100%;border-radius:100px;'
-                f'box-shadow:0 0 10px {total_bc}55;transition:width 0.4s ease;"></div>'
+                f'box-shadow:0 0 12px {total_bc}55;transition:width 0.4s ease;"></div>'
                 f'</div></div>'
-                '<div style="border-top:1px solid rgba(255,255,255,0.07);margin:0 0 1rem 0;"></div>'
+                '<div style="border-top:1px solid rgba(255,255,255,0.08);margin:0 0 1.2rem 0;"></div>'
                 + strat_html +
                 '</div>'
             )
@@ -1294,107 +1292,168 @@ def render_planner_tab():
                 fig_donut.update_layout(
                     paper_bgcolor='rgba(18,20,30,0.75)',
                     plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='#ffffff', size=12, family='Pretendard'),
+                    font=dict(color='#ffffff', size=14, family='Pretendard'),
                     title=dict(
                         text="자산 비중",
-                        font=dict(color='#ffffff', size=14, family='Pretendard'),
+                        font=dict(color='#ffffff', size=16, family='Pretendard'),
                         x=0.5, xanchor='center', y=0.97
                     ),
                     legend=dict(
-                        font=dict(color='#ffffff', size=11, family='Pretendard'),
+                        font=dict(color='#ffffff', size=13, family='Pretendard'),
                         bgcolor='rgba(255,255,255,0.04)',
                         bordercolor='rgba(255,255,255,0.1)',
                         borderwidth=1,
                         orientation='v',
                         x=1.02, y=0.5, xanchor='left', yanchor='middle'
                     ),
-                    margin=dict(l=0, r=80, t=30, b=0),
-                    height=280
+                    margin=dict(l=0, r=90, t=35, b=10),
+                    height=380
                 )
                 fig_donut.update_traces(
-                    textfont=dict(color='#ffffff', size=11),
-                    textinfo='percent',
+                    textfont=dict(color='#ffffff', size=13, family='Pretendard'),
+                    textinfo='percent+label',
                     hovertemplate='%{label}<br>₩%{value:,.0f}<br>%{percent}<extra></extra>'
                 )
                 st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
 
-        # 종목 뱃지 그리드
+        # 종목 뱃지 그리드 — Macro → Long → Short 순, 전략 내 가나다순
         st.markdown("### 종목별 현황")
-        sorted_portfolio = sorted(portfolio_list, key=lambda x: x['name'])
 
         # 전략별 배지 색상 (dark: 진한색, light: 연한색)
         _badge_colors = {
-            'Long':  {'dark': '#2563eb', 'light': '#93c5fd'},  # 파랑
-            'Short': {'dark': '#dc2626', 'light': '#fca5a5'},  # 빨강
-            'Macro': {'dark': '#7c3aed', 'light': '#c4b5fd'},  # 보라
+            'Long':  {'dark': '#2563eb', 'light': '#93c5fd'},
+            'Short': {'dark': '#dc2626', 'light': '#fca5a5'},
+            'Macro': {'dark': '#7c3aed', 'light': '#c4b5fd'},
         }
+        _strat_label_colors = {'Long': '#3b82f6', 'Short': '#ef4444', 'Macro': '#8b5cf6'}
 
-        cols = st.columns(6)
-        for i, p in enumerate(sorted_portfolio):
-            with cols[i % 6]:
-                badge_c = _badge_colors.get(p['strategy'], {'dark': '#10b981', 'light': '#86efac'})
-                create_overlay_badge(
-                    p['name'], p['progress'], f"badge_{p['id']}",
-                    show_stock_detail_modal, p['id'],
-                    dark_color=badge_c['dark'], light_color=badge_c['light']
-                )
+        for _strat in ['Macro', 'Long', 'Short']:
+            strat_items = sorted(
+                [p for p in portfolio_list if p['strategy'] == _strat],
+                key=lambda x: x['name']
+            )
+            if not strat_items:
+                continue
+            sc = _strat_label_colors[_strat]
+            st.markdown(
+                f'<div style="display:inline-block;background:{sc};color:#fff;'
+                f'padding:4px 16px;border-radius:20px;font-size:0.82rem;font-weight:700;'
+                f'margin:0.8rem 0 0.5rem 0;">{_strat}</div>',
+                unsafe_allow_html=True
+            )
+            badge_c = _badge_colors.get(_strat, {'dark': '#10b981', 'light': '#86efac'})
+            cols = st.columns(6)
+            for i, p in enumerate(strat_items):
+                with cols[i % 6]:
+                    create_overlay_badge(
+                        p['name'], p['progress'], f"badge_{p['id']}",
+                        show_stock_detail_modal, p['id'],
+                        dark_color=badge_c['dark'], light_color=badge_c['light']
+                    )
 
-        # 전체 현황판 - Streamlit columns 기반 카드 그리드
+        # 전체 현황판 — Macro → Long → Short 순, 전략 내 가나다순
         with st.expander("📋 전체 현황판", expanded=True):
-            if sorted_portfolio:
+            if portfolio_list:
                 strategy_color_map = {'Long': '#3b82f6', 'Short': '#ef4444', 'Macro': '#8b5cf6'}
-                COLS = 3  # 한 행에 카드 몇 개
-                rows = [sorted_portfolio[i:i+COLS] for i in range(0, len(sorted_portfolio), COLS)]
-                for row_items in rows:
-                    col_objs = st.columns(COLS)
-                    for col, p in zip(col_objs, row_items):
-                        progress_val = min(100, max(0, float(p['progress'])))
-                        strategy = str(p.get('strategy', 'Long'))
-                        strategy_color = strategy_color_map.get(strategy, '#6b7280')
+                COLS = 3
+                for _strat in ['Macro', 'Long', 'Short']:
+                    strat_items = sorted(
+                        [p for p in portfolio_list if p['strategy'] == _strat],
+                        key=lambda x: x['name']
+                    )
+                    if not strat_items:
+                        continue
+                    sc = strategy_color_map[_strat]
+                    st.markdown(
+                        f'<div style="display:inline-block;background:{sc};color:#fff;'
+                        f'padding:4px 16px;border-radius:20px;font-size:0.82rem;font-weight:700;'
+                        f'margin:0.8rem 0 0.6rem 0;">{_strat}</div>',
+                        unsafe_allow_html=True
+                    )
+                    rows = [strat_items[i:i+COLS] for i in range(0, len(strat_items), COLS)]
+                    for row_items in rows:
+                        col_objs = st.columns(COLS)
+                        for col, p in zip(col_objs, row_items):
+                            progress_val = min(100, max(0, float(p['progress'])))
+                            strategy_color = strategy_color_map.get(_strat, '#6b7280')
 
-                        if progress_val >= 80:
-                            bar_color = '#10b981'
-                            bar_glow = 'rgba(16,185,129,0.45)'
-                        elif progress_val >= 50:
-                            bar_color = '#6366f1'
-                            bar_glow = 'rgba(99,102,241,0.45)'
-                        else:
-                            bar_color = '#f59e0b'
-                            bar_glow = 'rgba(245,158,11,0.45)'
+                            if progress_val >= 80:
+                                bar_color = '#10b981'
+                                bar_glow = 'rgba(16,185,129,0.45)'
+                            elif progress_val >= 50:
+                                bar_color = '#6366f1'
+                                bar_glow = 'rgba(99,102,241,0.45)'
+                            else:
+                                bar_color = '#f59e0b'
+                                bar_glow = 'rgba(245,158,11,0.45)'
 
-                        budget_display = f"₩{p['budget']:,.0f}" if p['budget'] > 0 else "미설정"
+                            budget_display = f"₩{p['budget']:,.0f}" if p['budget'] > 0 else "미설정"
+                            p_id_safe = re.sub(r'[^a-zA-Z0-9\-]', '-', str(p['id']))
+                            marker_id = f"crd-{p_id_safe}"
 
-                        with col:
-                            st.markdown(f"""
-                            <div style="
-                                background:rgba(255,255,255,0.05);
-                                border:1px solid rgba(255,255,255,0.12);
-                                border-radius:14px;
-                                padding:1.2rem;
-                                margin-bottom:0.6rem;
-                                box-shadow:0 4px 15px rgba(0,0,0,0.25);
-                            ">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
-                                    <span style="color:#ffffff;font-weight:700;font-size:0.97rem;">{p['name']}</span>
-                                    <span style="background:{strategy_color};color:#fff;padding:0.12rem 0.6rem;border-radius:20px;font-size:0.7rem;font-weight:700;">{strategy}</span>
-                                </div>
-                                <div style="display:flex;justify-content:space-between;margin-bottom:0.2rem;">
-                                    <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">투자금액</span>
-                                    <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">예산</span>
-                                </div>
-                                <div style="display:flex;justify-content:space-between;margin-bottom:0.9rem;">
-                                    <span style="color:#ffffff;font-size:0.92rem;font-weight:600;">₩{p['invested']:,.0f}</span>
-                                    <span style="color:rgba(255,255,255,0.55);font-size:0.88rem;">{budget_display}</span>
-                                </div>
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
-                                    <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">매수 진행률</span>
-                                    <span style="color:{bar_color};font-weight:700;font-size:0.9rem;">{progress_val:.1f}%</span>
-                                </div>
-                                <div style="background:rgba(255,255,255,0.12);border-radius:100px;height:10px;overflow:hidden;">
-                                    <div style="background:linear-gradient(90deg,{bar_color},{bar_color}99);width:{progress_val:.2f}%;height:100%;border-radius:100px;box-shadow:0 0 8px {bar_glow};"></div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            with col:
+                                # 카드 HTML — 하단 border/radius 없음 (버튼이 푸터로 연결)
+                                st.markdown(
+                                    f'<div style="background:rgba(255,255,255,0.05);'
+                                    f'border:1px solid rgba(255,255,255,0.12);'
+                                    f'border-bottom:none;'
+                                    f'border-radius:14px 14px 0 0;'
+                                    f'padding:1.2rem 1.2rem 1rem 1.2rem;'
+                                    f'box-shadow:0 4px 15px rgba(0,0,0,0.25);">'
+                                    f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">'
+                                    f'<span style="color:#ffffff;font-weight:700;font-size:0.97rem;">{p["name"]}</span>'
+                                    f'<span style="background:{strategy_color};color:#fff;padding:0.12rem 0.6rem;'
+                                    f'border-radius:20px;font-size:0.7rem;font-weight:700;">{_strat}</span>'
+                                    f'</div>'
+                                    f'<div style="display:flex;justify-content:space-between;margin-bottom:0.2rem;">'
+                                    f'<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">투자금액</span>'
+                                    f'<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">예산</span>'
+                                    f'</div>'
+                                    f'<div style="display:flex;justify-content:space-between;margin-bottom:0.9rem;">'
+                                    f'<span style="color:#ffffff;font-size:0.92rem;font-weight:600;">₩{p["invested"]:,.0f}</span>'
+                                    f'<span style="color:rgba(255,255,255,0.55);font-size:0.88rem;">{budget_display}</span>'
+                                    f'</div>'
+                                    f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">'
+                                    f'<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">매수 진행률</span>'
+                                    f'<span style="color:{bar_color};font-weight:700;font-size:0.9rem;">{progress_val:.1f}%</span>'
+                                    f'</div>'
+                                    f'<div style="background:rgba(255,255,255,0.12);border-radius:100px;height:10px;overflow:hidden;">'
+                                    f'<div style="background:linear-gradient(90deg,{bar_color},{bar_color}99);'
+                                    f'width:{progress_val:.2f}%;height:100%;border-radius:100px;'
+                                    f'box-shadow:0 0 8px {bar_glow};"></div>'
+                                    f'</div></div>',
+                                    unsafe_allow_html=True
+                                )
+
+                                # CSS 마커 — 다음 버튼을 카드 푸터처럼 스타일링
+                                st.markdown(
+                                    f'<span id="{marker_id}" style="display:none;"></span>'
+                                    f'<style>'
+                                    f'[data-testid="stElementContainer"]:has(#{marker_id})'
+                                    f' + [data-testid="stElementContainer"] {{ margin-top:-4px !important; }}'
+                                    f'[data-testid="stElementContainer"]:has(#{marker_id})'
+                                    f' + [data-testid="stElementContainer"] [data-testid="stButton"] button {{'
+                                    f'  background:rgba(255,255,255,0.06) !important;'
+                                    f'  border:1px solid rgba(255,255,255,0.12) !important;'
+                                    f'  border-top:none !important;'
+                                    f'  border-radius:0 0 14px 14px !important;'
+                                    f'  color:rgba(255,255,255,0.5) !important;'
+                                    f'  font-size:0.75rem !important;'
+                                    f'  font-weight:500 !important;'
+                                    f'  min-height:30px !important;'
+                                    f'  padding:0.3rem 0.5rem !important;'
+                                    f'  box-shadow:none !important;'
+                                    f'}}'
+                                    f'[data-testid="stElementContainer"]:has(#{marker_id})'
+                                    f' + [data-testid="stElementContainer"] [data-testid="stButton"] button:hover {{'
+                                    f'  background:rgba(255,255,255,0.12) !important;'
+                                    f'  color:#ffffff !important;'
+                                    f'}}'
+                                    f'</style>',
+                                    unsafe_allow_html=True
+                                )
+                                if st.button("🔍 상세보기", key=f"crd_{p_id_safe}", use_container_width=True):
+                                    show_stock_detail_modal(p['id'])
             else:
                 st.info("표시할 종목이 없습니다.")
 
