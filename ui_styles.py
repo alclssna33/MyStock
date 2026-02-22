@@ -745,7 +745,7 @@ def inject_custom_css():
     [data-testid="stExpander"] {
         border: 1px solid rgba(99, 102, 241, 0.3) !important;
         border-radius: 12px !important;
-        overflow: hidden !important;
+        overflow: visible !important;   /* hidden → visible: 내부 카드 잘림 방지 */
         background: rgba(20, 25, 50, 0.5) !important;
         margin-bottom: 0.8rem !important;
     }
@@ -754,10 +754,9 @@ def inject_custom_css():
     [data-testid="stExpander"] > details > summary {
         background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%) !important;
         padding: 0.9rem 1.2rem !important;
-        border-radius: 12px !important;
+        border-radius: 12px 12px 0 0 !important;
     }
-    [data-testid="stExpander"] summary:hover,
-    [data-testid="stExpander"] > details[open] > summary {
+    [data-testid="stExpander"] summary:hover {
         background: linear-gradient(135deg, #3730a3 0%, #312e81 100%) !important;
     }
     [data-testid="stExpander"] summary p,
@@ -774,7 +773,8 @@ def inject_custom_css():
     [data-testid="stExpanderDetails"] {
         background: rgba(30, 41, 59, 0.3) !important;
         border-top: 1px solid rgba(99, 102, 241, 0.2) !important;
-        padding: 1rem !important;
+        padding: 1rem 1.2rem !important;
+        overflow: visible !important;
     }
 
     /* === 17. 현황판 카드 스타일 === */

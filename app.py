@@ -210,7 +210,7 @@ def show_stock_detail_modal(stock_id):
                 df_split.at[stock_idx, 'Installments'] = int(new_installments)
                 save_split_purchase_data(df_split)
                 st.success("수정되었습니다!")
-                st.rerun()
+                st.rerun(scope="app")
     
     st.progress(max(0.0, min(1.0, progress / 100)))
     col_p1, col_p2 = st.columns(2)
@@ -236,7 +236,7 @@ def show_stock_detail_modal(stock_id):
                         df_split.at[stock_idx, 'BuyTransactions'] = json.dumps([t for t in buy_txs if t])
                         save_split_purchase_data(df_split)
                         st.success("저장되었습니다!")
-                        st.rerun()
+                        st.rerun(scope="app")
     
     with col_sell:
         st.subheader("분할 매도 기록")
@@ -250,7 +250,7 @@ def show_stock_detail_modal(stock_id):
                 df_split.at[stock_idx, 'SellTransactions'] = json.dumps(sell_txs)
                 save_split_purchase_data(df_split)
                 st.success("저장되었습니다!")
-                st.rerun()
+                st.rerun(scope="app")
         
         for i, tx in enumerate(sell_txs):
             with st.container():
@@ -260,20 +260,21 @@ def show_stock_detail_modal(stock_id):
                     sell_txs.pop(i)
                     df_split.at[stock_idx, 'SellTransactions'] = json.dumps(sell_txs)
                     save_split_purchase_data(df_split)
-                    st.rerun()
+                    st.rerun(scope="app")
 
     st.divider()
     if st.button(f"🗑️ {stock_name} 삭제", key=f"del_stock_{stock_id}", type="secondary"):
         df_all = load_stocks()
         df_all = df_all[df_all['Symbol'] != stock_id]
         save_stocks(df_all)
-        st.rerun()
+        st.rerun(scope="app")
 
-# 메인 화면 - 탭 구조
-tab1, tab2 = st.tabs(["📈 주식 추적기", "💰 분할 매수 플래너"])
+# === Fragment 렌더링 함수 정의 ===
+# 탭별 Fragment로 분리하여 탭 간 상호 재실행 방지
 
-# 탭 1: 주식 추적기
-with tab1:
+@st.fragment
+def render_tracker_tab():
+    """탭1: 주식 추적기 - 독립 실행 Fragment"""
     st.title("📈 나만의 주식 추적기")
     
     df = load_stocks()
@@ -1235,8 +1236,10 @@ with tab1:
                 else:
                     st.error(f"{symbol} 종목의 데이터를 가져올 수 없습니다. 티커를 확인해주세요.")
 
-# 탭 2: 분할 매수 플래너
-with tab2:
+
+@st.fragment
+def render_planner_tab():
+    """탭2: 분할 매수 플래너 - 독립 실행 Fragment"""
     st.title("💰 주식 분할 매수 플래너")
     
     df_all = load_stocks()
@@ -1310,7 +1313,26 @@ with tab2:
         # 도넛 차트
         if total_invested > 0:
             fig_donut = px.pie(pd.DataFrame(portfolio_list), values='invested', names='name', hole=0.6, title="자산 비중")
-            fig_donut.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+            fig_donut.update_layout(
+                paper_bgcolor='rgba(26, 26, 46, 0.8)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#ffffff', size=13, family='Pretendard'),
+                title=dict(
+                    text="자산 비중",
+                    font=dict(color='#ffffff', size=16, family='Pretendard'),
+                    x=0.5, xanchor='center'
+                ),
+                legend=dict(
+                    font=dict(color='#ffffff', size=12, family='Pretendard'),
+                    bgcolor='rgba(255,255,255,0.05)',
+                    bordercolor='rgba(255,255,255,0.15)',
+                    borderwidth=1,
+                )
+            )
+            fig_donut.update_traces(
+                textfont=dict(color='#ffffff', size=13),
+                textinfo='percent+label'
+            )
             st.plotly_chart(fig_donut, use_container_width=True)
 
         # 종목 뱃지 그리드
@@ -1321,54 +1343,71 @@ with tab2:
             with cols[i % 6]:
                 create_overlay_badge(p['name'], p['progress'], f"badge_{p['id']}", show_stock_detail_modal, p['id'])
 
-        # 전체 현황판 - 카드 그리드 형태
+        # 전체 현황판 - Streamlit columns 기반 카드 그리드
         with st.expander("📋 전체 현황판", expanded=True):
-            pdf = pd.DataFrame(sorted_portfolio)
-            if not pdf.empty:
+            if sorted_portfolio:
                 strategy_color_map = {'Long': '#3b82f6', 'Short': '#ef4444', 'Macro': '#8b5cf6'}
+                COLS = 3  # 한 행에 카드 몇 개
+                rows = [sorted_portfolio[i:i+COLS] for i in range(0, len(sorted_portfolio), COLS)]
+                for row_items in rows:
+                    col_objs = st.columns(COLS)
+                    for col, p in zip(col_objs, row_items):
+                        progress_val = min(100, max(0, float(p['progress'])))
+                        strategy = str(p.get('strategy', 'Long'))
+                        strategy_color = strategy_color_map.get(strategy, '#6b7280')
 
-                card_parts = ['<div class="portfolio-card-grid">']
-                for _, row in pdf.iterrows():
-                    progress_val = min(100, max(0, float(row['progress'])))
-                    strategy = str(row.get('strategy', 'Long'))
-                    strategy_color = strategy_color_map.get(strategy, '#6b7280')
+                        if progress_val >= 80:
+                            bar_color = '#10b981'
+                            bar_glow = 'rgba(16,185,129,0.45)'
+                        elif progress_val >= 50:
+                            bar_color = '#6366f1'
+                            bar_glow = 'rgba(99,102,241,0.45)'
+                        else:
+                            bar_color = '#f59e0b'
+                            bar_glow = 'rgba(245,158,11,0.45)'
 
-                    # 진행률에 따른 색상
-                    if progress_val >= 80:
-                        bar_color = '#10b981'
-                        bar_glow = 'rgba(16, 185, 129, 0.45)'
-                    elif progress_val >= 50:
-                        bar_color = '#6366f1'
-                        bar_glow = 'rgba(99, 102, 241, 0.45)'
-                    else:
-                        bar_color = '#f59e0b'
-                        bar_glow = 'rgba(245, 158, 11, 0.45)'
+                        budget_display = f"₩{p['budget']:,.0f}" if p['budget'] > 0 else "미설정"
 
-                    budget_display = f"₩{row['budget']:,.0f}" if row['budget'] > 0 else "미설정"
+                        with col:
+                            st.markdown(f"""
+                            <div style="
+                                background:rgba(255,255,255,0.05);
+                                border:1px solid rgba(255,255,255,0.12);
+                                border-radius:14px;
+                                padding:1.2rem;
+                                margin-bottom:0.6rem;
+                                box-shadow:0 4px 15px rgba(0,0,0,0.25);
+                            ">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+                                    <span style="color:#ffffff;font-weight:700;font-size:0.97rem;">{p['name']}</span>
+                                    <span style="background:{strategy_color};color:#fff;padding:0.12rem 0.6rem;border-radius:20px;font-size:0.7rem;font-weight:700;">{strategy}</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;margin-bottom:0.2rem;">
+                                    <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">투자금액</span>
+                                    <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">예산</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;margin-bottom:0.9rem;">
+                                    <span style="color:#ffffff;font-size:0.92rem;font-weight:600;">₩{p['invested']:,.0f}</span>
+                                    <span style="color:rgba(255,255,255,0.55);font-size:0.88rem;">{budget_display}</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+                                    <span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">매수 진행률</span>
+                                    <span style="color:{bar_color};font-weight:700;font-size:0.9rem;">{progress_val:.1f}%</span>
+                                </div>
+                                <div style="background:rgba(255,255,255,0.12);border-radius:100px;height:10px;overflow:hidden;">
+                                    <div style="background:linear-gradient(90deg,{bar_color},{bar_color}99);width:{progress_val:.2f}%;height:100%;border-radius:100px;box-shadow:0 0 8px {bar_glow};"></div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+            else:
+                st.info("표시할 종목이 없습니다.")
 
-                    card_parts.append(f"""
-                    <div class="portfolio-card">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.9rem;">
-                            <span style="color:#ffffff; font-weight:700; font-size:1rem; letter-spacing:-0.01em;">{row['name']}</span>
-                            <span style="background:{strategy_color}; color:#fff; padding:0.15rem 0.65rem; border-radius:20px; font-size:0.72rem; font-weight:700; letter-spacing:0.03em; text-transform:uppercase;">{strategy}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
-                            <span style="color:rgba(255,255,255,0.45); font-size:0.78rem;">투자금액</span>
-                            <span style="color:rgba(255,255,255,0.45); font-size:0.78rem;">예산</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
-                            <span style="color:#ffffff; font-size:0.95rem; font-weight:600;">₩{row['invested']:,.0f}</span>
-                            <span style="color:rgba(255,255,255,0.6); font-size:0.9rem;">{budget_display}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
-                            <span style="color:rgba(255,255,255,0.45); font-size:0.78rem;">매수 진행률</span>
-                            <span style="color:{bar_color}; font-weight:700; font-size:0.92rem;">{progress_val:.1f}%</span>
-                        </div>
-                        <div class="progress-bar-track">
-                            <div style="background:linear-gradient(90deg, {bar_color}, {bar_color}99); width:{progress_val:.2f}%; height:100%; border-radius:100px; box-shadow:0 0 8px {bar_glow};"></div>
-                        </div>
-                    </div>
-                    """)
 
-                card_parts.append('</div>')
-                st.markdown('\n'.join(card_parts), unsafe_allow_html=True)
+# === 메인 화면 - 탭 구조 ===
+tab1, tab2 = st.tabs(["📈 주식 추적기", "💰 분할 매수 플래너"])
+
+with tab1:
+    render_tracker_tab()
+
+with tab2:
+    render_planner_tab()
