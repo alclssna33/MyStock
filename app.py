@@ -1140,7 +1140,7 @@ def render_planner_tab():
             avg_price = buy_cost / buy_qty if buy_qty > 0 else 0
             current_invested = (buy_qty - sell_qty) * avg_price
             
-            try: m_cap = float(stock.get('MarketCap', 0)) / 10000
+            try: m_cap = float(stock.get('MarketCap', 0))  # 원 단위로 저장됨
             except: m_cap = 0
             
             portfolio_list.append({
@@ -1201,6 +1201,7 @@ def render_planner_tab():
                                 idx = df_all[dup_mask].index[0]
                                 df_all.at[idx, 'Installments'] = int(q_installments)
                                 df_all.at[idx, 'Category'] = q_strategy
+                                df_all.at[idx, 'MarketCap'] = q_mcap * 100_000_000  # 시총 업데이트 누락 버그 수정
                                 existing_name = str(df_all.at[idx, 'Name'])
                                 save_stocks(df_all)
                                 st.success(f"기존 종목 '{existing_name}'을 플래너에 추가했습니다.")
@@ -1251,10 +1252,10 @@ def render_planner_tab():
                     f'{_s} <span style="opacity:0.65;">x{count}</span></div>'
                     f'<div style="flex:1;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">'
-                    f'<span style="color:rgba(255,255,255,0.6);font-size:0.8rem;font-weight:600;">'
-                    f'{inv_str} <span style="opacity:0.6;font-size:0.75rem;">/ {bud_str}</span></span>'
+                    f'<span style="color:#ffffff;font-size:1.0rem;font-weight:800;">{inv_str}</span>'
                     f'<span style="color:{bc};font-weight:800;font-size:0.95rem;">{sp_str}%</span>'
                     f'</div>'
+                    f'<div style="color:rgba(255,255,255,0.4);font-size:0.75rem;margin-bottom:5px;">예산 {bud_str}</div>'
                     f'<div style="background:rgba(255,255,255,0.12);border-radius:100px;height:7px;overflow:hidden;">'
                     f'<div style="background:{bc};width:{sp_capped}%;height:100%;'
                     f'border-radius:100px;box-shadow:0 0 6px {bc}99;"></div>'
@@ -1271,9 +1272,11 @@ def render_planner_tab():
                 '<span style="font-weight:700;font-size:1.05rem;color:#fff;">전체</span>'
                 f'<div style="text-align:right;">'
                 f'<span style="color:{total_bc};font-weight:800;font-size:1.5rem;">{total_pct_str}%</span>'
-                f'<span style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-left:8px;">{total_invested_str} 투자</span>'
                 f'</div></div>'
-                f'<div style="color:rgba(255,255,255,0.4);font-size:0.8rem;font-weight:500;margin-bottom:8px;">예산 {total_budget_str}</div>'
+                f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">'
+                f'<span style="color:#ffffff;font-size:1.1rem;font-weight:800;">{total_invested_str}</span>'
+                f'<span style="color:rgba(255,255,255,0.45);font-size:0.82rem;">예산 {total_budget_str}</span>'
+                f'</div>'
                 f'<div style="background:rgba(255,255,255,0.12);border-radius:100px;height:11px;overflow:hidden;">'
                 f'<div style="background:linear-gradient(90deg,{total_bc},{total_bc}bb);'
                 f'width:{total_pct_capped_str}%;height:100%;border-radius:100px;'
@@ -1387,7 +1390,7 @@ def render_planner_tab():
                                 bar_color = '#f59e0b'
                                 bar_glow = 'rgba(245,158,11,0.45)'
 
-                            budget_display = f"₩{p['budget']:,.0f}" if p['budget'] > 0 else "미설정"
+                            budget_display = _fmt(p['budget']) if p['budget'] > 0 else "미설정"
                             p_id_safe = re.sub(r'[^a-zA-Z0-9\-]', '-', str(p['id']))
                             marker_id = f"crd-{p_id_safe}"
 
@@ -1405,13 +1408,17 @@ def render_planner_tab():
                                     f'<span style="background:{strategy_color};color:#fff;padding:0.12rem 0.6rem;'
                                     f'border-radius:20px;font-size:0.7rem;font-weight:700;">{_strat}</span>'
                                     f'</div>'
-                                    f'<div style="display:flex;justify-content:space-between;margin-bottom:0.2rem;">'
-                                    f'<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">투자금액</span>'
-                                    f'<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">예산</span>'
+                                    f'<div style="margin-bottom:0.15rem;">'
+                                    f'<span style="color:rgba(255,255,255,0.45);font-size:0.72rem;">투자금액</span>'
                                     f'</div>'
-                                    f'<div style="display:flex;justify-content:space-between;margin-bottom:0.9rem;">'
-                                    f'<span style="color:#ffffff;font-size:0.92rem;font-weight:600;">₩{p["invested"]:,.0f}</span>'
-                                    f'<span style="color:rgba(255,255,255,0.55);font-size:0.88rem;">{budget_display}</span>'
+                                    f'<div style="margin-bottom:0.6rem;">'
+                                    f'<span style="color:#ffffff;font-size:1.25rem;font-weight:800;letter-spacing:-0.02em;">₩{p["invested"]:,.0f}</span>'
+                                    f'</div>'
+                                    f'<div style="margin-bottom:0.15rem;">'
+                                    f'<span style="color:rgba(255,255,255,0.45);font-size:0.72rem;">예산</span>'
+                                    f'</div>'
+                                    f'<div style="margin-bottom:0.9rem;">'
+                                    f'<span style="color:rgba(255,255,255,0.75);font-size:1.05rem;font-weight:700;">{budget_display}</span>'
                                     f'</div>'
                                     f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">'
                                     f'<span style="color:rgba(255,255,255,0.4);font-size:0.75rem;">매수 진행률</span>'
