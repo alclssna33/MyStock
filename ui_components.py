@@ -2,11 +2,14 @@ import streamlit as st
 import json
 import re
 
-def create_overlay_badge(name, progress, key, callback, *args):
-    """진행률 그라데이션 배지 버튼 - CSS :has() 선택자로 st.button에 직접 스타일 주입"""
+def create_overlay_badge(name, progress, key, callback, *args, dark_color=None, light_color=None):
+    """진행률 그라데이션 배지 버튼 - CSS :has() 선택자로 st.button에 직접 스타일 주입
+
+    dark_color / light_color: 전략별 색상 오버라이드 (기본: 초록)
+    """
     progress_pct = min(100, max(0, progress))
-    dark_green = '#10b981'
-    light_green = '#86efac'
+    dark_green = dark_color if dark_color else '#10b981'
+    light_green = light_color if light_color else '#86efac'
     gradient = f'linear-gradient(to right, {dark_green} 0%, {dark_green} {progress_pct}%, {light_green} {progress_pct}%, {light_green} 100%)'
 
     # CSS ID에 안전한 문자만 허용 (점·슬래시 등 특수문자 → 하이픈)
