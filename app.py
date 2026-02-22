@@ -42,11 +42,13 @@ def add_stock_callback():
     
     if symbol and name:
         df = load_stocks()
-        
-        # 중복 체크: 대소문자 무시, 공백 제거 비교
+
+        # Symbol 정규화: 대소문자 무시, 공백 제거, 숫자만인 경우 6자리 0패딩
         symbol_normalized = symbol.strip().upper()
+        if symbol_normalized.isdigit():
+            symbol_normalized = symbol_normalized.zfill(6)
         existing_symbols = df['Symbol'].astype(str).str.strip().str.upper()
-        
+
         if symbol_normalized in existing_symbols.values:
             st.session_state["add_result"] = {"type": "error", "message": "이미 등록된 종목입니다."}
         else:
@@ -113,16 +115,18 @@ with st.sidebar:
         selected_delete = st.selectbox("삭제할 종목 선택", delete_options, key="delete_select")
         
         if st.button("삭제", key="delete_button"):
-            # 정렬된 리스트에서 선택된 항목의 Symbol 추출
-            # 형식: "Name (Symbol)"
-            selected_symbol = selected_delete.split("(")[1].rstrip(")")
-            # 원본 df에서 해당 Symbol로 찾기
-            mask = df['Symbol'] == selected_symbol
+            # 형식: "Name (Symbol)" 에서 Symbol 추출
+            selected_symbol = selected_delete.split("(")[-1].rstrip(")").strip()
+            # 타입 안전 비교 (Symbol이 int로 읽혔을 경우 대비)
+            mask = df['Symbol'].astype(str).str.strip() == selected_symbol
             deleted_name = df.loc[mask, 'Name'].values[0] if mask.any() else selected_delete.split("(")[0].strip()
-            df = df[~mask].reset_index(drop=True)
-            save_stocks(df)
-            st.success(f"{deleted_name} 종목이 삭제되었습니다!")
-            st.rerun()
+            if mask.any():
+                df = df[~mask].reset_index(drop=True)
+                save_stocks(df)
+                st.success(f"{deleted_name} 종목이 삭제되었습니다!")
+                st.rerun()
+            else:
+                st.error(f"'{selected_symbol}' 종목을 찾을 수 없습니다.")
     else:
         st.info("저장된 종목이 없습니다.")
 
@@ -265,7 +269,9 @@ def show_stock_detail_modal(stock_id):
     st.divider()
     if st.button(f"🗑️ {stock_name} 삭제", key=f"del_stock_{stock_id}", type="secondary"):
         df_all = load_stocks()
-        df_all = df_all[df_all['Symbol'] != stock_id]
+        # 타입 안전 비교 (Symbol이 int로 읽혔을 경우 대비)
+        mask = df_all['Symbol'].astype(str).str.strip() != str(stock_id).strip()
+        df_all = df_all[mask].reset_index(drop=True)
         save_stocks(df_all)
         st.rerun(scope="app")
 
@@ -1312,23 +1318,43 @@ def render_planner_tab():
                     q_strategy = st.selectbox("투자전략", ["Long", "Short", "Macro"])
                     if st.form_submit_button("추가"):
                         if q_symbol and q_name:
-                            new_stock = {
-                                "Symbol": q_symbol.strip().upper(),
-                                "Name": q_name,
-                                "MarketCap": q_mcap * 100000000,
-                                "Installments": int(q_installments),
-                                "Category": q_strategy,
-                                "BuyTransactions": "[]",
-                                "SellTransactions": "[]"
-                            }
-                            save_stocks(pd.concat([df_all, pd.DataFrame([new_stock])], ignore_index=True))
+                            # Symbol 정규화 (숫자만인 경우 6자리 0패딩)
+                            q_sym_norm = q_symbol.strip().upper()
+                            if q_sym_norm.isdigit():
+                                q_sym_norm = q_sym_norm.zfill(6)
+
+                            # 기존 종목 중복 확인 (관심종목 포함)
+                            existing_symbols = df_all['Symbol'].astype(str).str.strip().str.upper()
+                            dup_mask = existing_symbols == q_sym_norm
+
+                            if dup_mask.any():
+                                # 기존 종목 활용: Installments와 Category(투자전략)만 업데이트
+                                idx = df_all[dup_mask].index[0]
+                                df_all.at[idx, 'Installments'] = int(q_installments)
+                                df_all.at[idx, 'Category'] = q_strategy
+                                existing_name = str(df_all.at[idx, 'Name'])
+                                save_stocks(df_all)
+                                st.success(f"기존 종목 '{existing_name}'을 플래너에 추가했습니다.")
+                            else:
+                                # 완전히 새로운 종목 추가
+                                new_stock = {
+                                    "Symbol": q_sym_norm,
+                                    "Name": q_name,
+                                    "MarketCap": q_mcap * 100000000,
+                                    "Installments": int(q_installments),
+                                    "Category": q_strategy,
+                                    "BuyTransactions": "[]",
+                                    "SellTransactions": "[]"
+                                }
+                                save_stocks(pd.concat([df_all, pd.DataFrame([new_stock])], ignore_index=True))
+                                st.success(f"'{q_name}' 종목이 추가되었습니다.")
                             st.rerun()
 
         # 도넛 차트
         if total_invested > 0:
             fig_donut = px.pie(pd.DataFrame(portfolio_list), values='invested', names='name', hole=0.6, title="자산 비중")
             fig_donut.update_layout(
-                paper_bgcolor='rgba(26, 26, 46, 0.8)',
+                paper_bgcolor='rgba(46, 46, 46, 0.9)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color='#ffffff', size=13, family='Pretendard'),
                 title=dict(

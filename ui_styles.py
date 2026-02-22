@@ -8,7 +8,7 @@ def inject_custom_css():
     
     /* === 1. 전체 기본 텍스트 (흰색) === */
     .stApp {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        background: linear-gradient(135deg, #2e2e2e 0%, #383838 100%);
         font-family: 'Pretendard', sans-serif;
         color: #FFFFFF !important;
     }
@@ -268,7 +268,7 @@ def inject_custom_css():
 
     /* === 6. 사이드바 스타일 === */
     section[data-testid="stSidebar"] {
-        background-color: #262730 !important;
+        background-color: #252525 !important;
     }
     section[data-testid="stSidebar"] * {
         color: #FFFFFF !important;
@@ -509,7 +509,7 @@ def inject_custom_css():
     section[role="dialog"],
     div[data-baseweb="modal"],
     div[data-baseweb="Modal"] {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+        background: linear-gradient(135deg, #2e2e2e 0%, #383838 100%) !important;
         color: #FFFFFF !important;
     }
     

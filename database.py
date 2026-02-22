@@ -91,20 +91,36 @@ def load_stocks():
         spreadsheet = client.open(SPREADSHEET_NAME)
         worksheet = spreadsheet.worksheet("Stocks")
         
-        # 모든 데이터 가져오기
-        records = worksheet.get_all_records()
-        
-        if not records:
-            # 빈 DataFrame 반환 (헤더만 있는 경우)
-            columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap", "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
-            return pd.DataFrame(columns=columns)
-        
-        # DataFrame으로 변환
-        df = pd.DataFrame(records)
-        
-        # 빈 값 처리 (Google Sheets는 빈 셀을 빈 문자열로 반환)
+        # get_all_values() 사용: 모든 값을 문자열로 유지 (000123 → "000123" 보존)
+        # get_all_records()는 숫자처럼 보이는 값을 정수로 자동변환하므로 사용 안 함
+        all_values = worksheet.get_all_values()
+
+        expected_columns = ["Symbol", "Name", "InterestDate", "Note", "MarketCap",
+                            "Installments", "Category", "BuyTransactions", "SellTransactions", "ChangeRate"]
+
+        if len(all_values) <= 1:
+            # 헤더만 있거나 완전히 빈 경우
+            return pd.DataFrame(columns=expected_columns)
+
+        headers = all_values[0]
+        data = all_values[1:]
+
+        # DataFrame으로 변환 (모든 값 문자열 유지)
+        df = pd.DataFrame(data, columns=headers)
+
+        # 없는 컬럼 추가
+        for col in expected_columns:
+            if col not in df.columns:
+                df[col] = ""
+
+        # 빈 문자열 → NA 처리
         df = df.replace("", pd.NA)
-        
+
+        # Symbol 컬럼: 항상 문자열로 유지 (앞의 0 보존)
+        if 'Symbol' in df.columns:
+            df['Symbol'] = df['Symbol'].astype(str).str.strip()
+            df.loc[df['Symbol'] == 'nan', 'Symbol'] = pd.NA
+
         return df
     except Exception as e:
         st.error(f"❌ 데이터 로드 실패: {str(e)}")
@@ -163,8 +179,9 @@ def save_stocks(df):
         values = [df.columns.tolist()] + df.values.tolist()
         
         # 기존 데이터 지우고 새 데이터 쓰기
+        # RAW 모드: 000123 같은 값을 숫자로 자동 변환하지 않고 문자열로 저장
         worksheet.clear()
-        worksheet.update(values, value_input_option='USER_ENTERED')
+        worksheet.update(values, value_input_option='RAW')
         
         # 캐시 무효화
         load_stocks.clear()
