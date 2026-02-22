@@ -1140,7 +1140,7 @@ def render_planner_tab():
             avg_price = buy_cost / buy_qty if buy_qty > 0 else 0
             current_invested = (buy_qty - sell_qty) * avg_price
             
-            try: m_cap = float(stock.get('MarketCap', 0))  # 원 단위로 저장됨
+            try: m_cap = float(stock.get('MarketCap', 0)) / 10000  # 저장값(×1억) ÷ 10000 = 만원→원 환산
             except: m_cap = 0
             
             portfolio_list.append({
@@ -1187,7 +1187,7 @@ def render_planner_tab():
                 with st.form("quick_add"):
                     q_symbol = st.text_input("티커 (예: AAPL)")
                     q_name = st.text_input("종목명")
-                    q_mcap = st.number_input("시총(억원)", min_value=0)
+                    q_mcap = st.number_input("예산(만원)", min_value=0)
                     q_installments = st.number_input("분할횟수", min_value=1, value=3, step=1)
                     q_strategy = st.selectbox("투자전략", ["Long", "Short", "Macro"])
                     if st.form_submit_button("추가"):
